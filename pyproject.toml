@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "aiohttp>=3.9",
+  "python-dotenv>=1.2.2",
 ]
 
 [project.optional-dependencies]
