@@ -203,11 +203,11 @@ async def test_media_player_state_props() -> None:
         assert mp.is_playing
         assert not mp.is_paused
         assert mp.volume_level == 0.3
-        assert mp.source == "Spotify"
+        assert mp.now_playing.source == "Spotify"
         mp._apply_state({"state": "paused", "attributes": {}})
         assert mp.is_paused
         assert mp.volume_level is None
-        assert mp.source is None
+        assert mp.now_playing.source is None
     finally:
         await ha.close()
 

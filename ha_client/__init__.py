@@ -18,6 +18,7 @@ from .domains import (
     FavoriteItem,
     Light,
     MediaPlayer,
+    NowPlaying,
     Sensor,
     Switch,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "HAClientError",
     "Light",
     "MediaPlayer",
+    "NowPlaying",
     "Sensor",
     "Switch",
     "SyncHAClient",

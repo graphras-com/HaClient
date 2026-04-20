@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 from ha_client import HAClient
+from ha_client.domains.media_player import NowPlaying
 
 from .fake_ha import FakeHA
 
@@ -66,21 +67,130 @@ async def test_media_player_on_mute_change(client: HAClient, fake_ha: FakeHA) ->
     assert captured == [(False, True)]
 
 
-async def test_media_player_on_source_change(client: HAClient, fake_ha: FakeHA) -> None:
+async def test_media_player_on_media_change_source(client: HAClient, fake_ha: FakeHA) -> None:
     player = client.media_player("living_room")
-    captured: list[tuple[Any, Any]] = []
+    captured: list[tuple[NowPlaying, NowPlaying]] = []
 
-    @player.on_source_change
+    @player.on_media_change
+    def handler(old: NowPlaying, new: NowPlaying) -> None:
+        captured.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "media_player.living_room",
+        {"state": "playing", "attributes": {"source": "Spotify", "media_title": "Song"}},
+        {"state": "playing", "attributes": {"source": "Radio", "media_title": "Song"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(captured) == 1
+    assert captured[0][0].source == "Radio"
+    assert captured[0][1].source == "Spotify"
+
+
+async def test_media_player_on_media_change_title(client: HAClient, fake_ha: FakeHA) -> None:
+    player = client.media_player("living_room")
+    captured: list[tuple[NowPlaying, NowPlaying]] = []
+
+    @player.on_media_change
+    def handler(old: NowPlaying, new: NowPlaying) -> None:
+        captured.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "media_player.living_room",
+        {"state": "playing", "attributes": {"media_title": "Lazarus", "media_artist": "David Bowie"}},
+        {"state": "playing", "attributes": {"media_title": "Heroes", "media_artist": "David Bowie"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(captured) == 1
+    assert captured[0][0].title == "Heroes"
+    assert captured[0][1].title == "Lazarus"
+
+
+async def test_media_player_on_media_change_not_fired_on_position(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """on_media_change must NOT fire when only position/progress changes."""
+    player = client.media_player("living_room")
+    captured: list[Any] = []
+
+    @player.on_media_change
     def handler(old: Any, new: Any) -> None:
         captured.append((old, new))
 
     await fake_ha.push_state_changed(
         "media_player.living_room",
-        {"state": "playing", "attributes": {"source": "Spotify"}},
-        {"state": "playing", "attributes": {"source": "Radio"}},
+        {
+            "state": "playing",
+            "attributes": {
+                "media_title": "Lazarus",
+                "media_position": 120,
+                "media_position_updated_at": "2026-04-20T23:03:00+00:00",
+            },
+        },
+        {
+            "state": "playing",
+            "attributes": {
+                "media_title": "Lazarus",
+                "media_position": 75,
+                "media_position_updated_at": "2026-04-20T23:02:14+00:00",
+            },
+        },
     )
     await asyncio.sleep(0.05)
-    assert captured == [("Radio", "Spotify")]
+    assert captured == []
+
+
+async def test_media_player_now_playing_property(client: HAClient, fake_ha: FakeHA) -> None:
+    player = client.media_player("living_room")
+
+    await fake_ha.push_state_changed(
+        "media_player.living_room",
+        {
+            "state": "playing",
+            "attributes": {
+                "source": "TV",
+                "media_title": "Lazarus",
+                "media_artist": "David Bowie",
+                "media_album_name": "Blackstar",
+                "media_channel": "Kringvarp Føroya",
+                "media_content_type": "music",
+                "media_content_id": "x-sonos-http:song",
+                "media_duration": 597,
+                "entity_picture": "/api/proxy",
+            },
+        },
+        None,
+    )
+    await asyncio.sleep(0.05)
+    np = player.now_playing
+    assert np.source == "TV"
+    assert np.title == "Lazarus"
+    assert np.artist == "David Bowie"
+    assert np.album == "Blackstar"
+    assert np.channel == "Kringvarp Føroya"
+    assert np.content_type == "music"
+    assert np.duration == 597
+
+
+async def test_media_player_remove_media_change_listener(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    player = client.media_player("living_room")
+    calls = 0
+
+    def handler(old: Any, new: Any) -> None:
+        nonlocal calls
+        calls += 1
+
+    player.on_media_change(handler)
+    player.remove_granular_listener(handler)
+
+    await fake_ha.push_state_changed(
+        "media_player.living_room",
+        {"state": "playing", "attributes": {"media_title": "New"}},
+        {"state": "playing", "attributes": {"media_title": "Old"}},
+    )
+    await asyncio.sleep(0.05)
+    assert calls == 0
 
 
 async def test_media_player_on_play(client: HAClient, fake_ha: FakeHA) -> None:

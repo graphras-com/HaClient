@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any
 
-from ..entity import Entity
+from ..entity import Entity, ValueChangeHandler
 from ..exceptions import CommandError, HAClientError
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,6 +21,45 @@ _LOGGER = logging.getLogger(__name__)
 # Safety cap so that misbehaving integrations cannot send us into a huge tree.
 _MAX_BROWSE_NODES = 2000
 _MAX_BROWSE_DEPTH = 6
+
+
+def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
+    """Build a :class:`NowPlaying` from a raw HA attributes dict."""
+    return NowPlaying(
+        source=attrs.get("source"),
+        title=attrs.get("media_title"),
+        artist=attrs.get("media_artist"),
+        album=attrs.get("media_album_name"),
+        channel=attrs.get("media_channel"),
+        content_type=attrs.get("media_content_type"),
+        content_id=attrs.get("media_content_id"),
+        duration=attrs.get("media_duration"),
+        entity_picture=attrs.get("entity_picture"),
+    )
+
+
+@dataclass(frozen=True)
+class NowPlaying:
+    """Structured snapshot of the media currently playing on a media player.
+
+    Groups all identity-related media attributes into a single object.
+    Position/progress fields are intentionally excluded — they change
+    continuously during playback and do not represent a change in *what*
+    is playing.
+
+    Instances are frozen (immutable and hashable) so two snapshots can be
+    compared with ``==`` to detect whether the playing media changed.
+    """
+
+    source: str | None = None
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+    channel: str | None = None
+    content_type: str | None = None
+    content_id: str | None = None
+    duration: int | None = None
+    entity_picture: str | None = None
 
 
 class FavoriteItem:
@@ -89,6 +129,10 @@ class MediaPlayer(Entity):
 
     domain = "media_player"
 
+    def __init__(self, entity_id: str, client: Any) -> None:
+        super().__init__(entity_id, client)
+        self._media_change_listeners: list[ValueChangeHandler] = []
+
     # --------------------------------------------------------------- events
     def on_volume_change(self, func: Any) -> Any:
         """Register a listener for volume level changes. Callback: ``(old, new)``."""
@@ -98,9 +142,17 @@ class MediaPlayer(Entity):
         """Register a listener for mute state changes. Callback: ``(old, new)``."""
         return self._register_attr_listener("is_volume_muted", func)
 
-    def on_source_change(self, func: Any) -> Any:
-        """Register a listener for source changes. Callback: ``(old, new)``."""
-        return self._register_attr_listener("source", func)
+    def on_media_change(self, func: Any) -> Any:
+        """Register a listener for when the playing media changes.
+
+        Fires when any identity attribute changes (source, title, artist,
+        album, channel, content_type, content_id, duration, entity_picture)
+        but **not** on position/progress updates.
+
+        Callback: ``(old: NowPlaying, new: NowPlaying)``.
+        """
+        self._media_change_listeners.append(func)
+        return func
 
     def on_play(self, func: Any) -> Any:
         """Register a listener for when playback starts. Callback: ``(old_state, new_state)``."""
@@ -113,6 +165,30 @@ class MediaPlayer(Entity):
     def on_stop(self, func: Any) -> Any:
         """Register a listener for when playback stops. Callback: ``(old_state, new_state)``."""
         return self._register_state_transition_listener("idle", func)
+
+    def _dispatch_granular_events(
+        self,
+        old_state: dict[str, Any] | None,
+        new_state: dict[str, Any] | None,
+    ) -> None:
+        """Dispatch base events plus :meth:`on_media_change`."""
+        super()._dispatch_granular_events(old_state, new_state)
+        old_attrs = (old_state or {}).get("attributes") or {}
+        new_attrs = (new_state or {}).get("attributes") or {}
+        old_np = _now_playing_from_attrs(old_attrs)
+        new_np = _now_playing_from_attrs(new_attrs)
+        if old_np != new_np:
+            for listener in list(self._media_change_listeners):
+                self._schedule_value(listener, old_np, new_np)
+
+    def remove_granular_listener(self, func: ValueChangeHandler) -> None:
+        """Remove a granular listener, including media-change listeners."""
+        import contextlib
+
+        with contextlib.suppress(ValueError):
+            self._media_change_listeners.remove(func)
+            return
+        super().remove_granular_listener(func)
 
     # ------------------------------------------------------------------ state
     @property
@@ -132,28 +208,9 @@ class MediaPlayer(Entity):
         return float(value) if isinstance(value, (int, float)) else None
 
     @property
-    def source(self) -> str | None:
-        """Currently selected source, if any."""
-        value = self.attributes.get("source")
-        return str(value) if value is not None else None
-
-    @property
-    def content_type(self) -> str | None:
-        """Current media content type (e.g. ``"music"``)."""
-        value = self.attributes.get("media_content_type")
-        return str(value) if value is not None else None
-
-    @property
-    def title(self) -> str | None:
-        """Current media title."""
-        value = self.attributes.get("media_title")
-        return str(value) if value is not None else None
-
-    @property
-    def channel(self) -> str | None:
-        """Current media channel."""
-        value = self.attributes.get("media_channel")
-        return str(value) if value is not None else None
+    def now_playing(self) -> NowPlaying:
+        """Structured snapshot of the currently playing media."""
+        return _now_playing_from_attrs(self.attributes)
 
     # ------------------------------------------------------------- playback
     async def play(self) -> None:

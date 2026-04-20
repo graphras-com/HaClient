@@ -90,6 +90,10 @@ player = ha.media_player("livingroom")
 await player.play()
 await player.set_volume(0.5)
 await player.next()
+
+# Access structured media info
+np = player.now_playing
+print(f"{np.artist} - {np.title} ({np.album})")
 ```
 
 ### Light control
@@ -135,7 +139,7 @@ Available events per domain:
 
 | Domain          | Events                                                                 |
 | --------------- | ---------------------------------------------------------------------- |
-| `MediaPlayer`   | `on_volume_change`, `on_mute_change`, `on_source_change`, `on_play`, `on_pause`, `on_stop` |
+| `MediaPlayer`   | `on_volume_change`, `on_mute_change`, `on_media_change`, `on_play`, `on_pause`, `on_stop` |
 | `Light`         | `on_turn_on`, `on_turn_off`, `on_brightness_change`, `on_color_change` |
 | `Switch`        | `on_turn_on`, `on_turn_off`                                            |
 | `BinarySensor`  | `on_turn_on`, `on_turn_off`                                            |
