@@ -198,14 +198,16 @@ async def test_media_player_state_props() -> None:
     try:
         mp = ha.media_player("livingroom")
         mp._apply_state(
-            {"state": "playing", "attributes": {"volume_level": 0.3, "source": "Spotify"}}
+            {"state": "playing", "attributes": {"volume_level": 0.3, "source": "Spotify", "is_volume_muted": True}}
         )
         assert mp.is_playing
         assert not mp.is_paused
+        assert mp.is_muted
         assert mp.volume_level == 0.3
         assert mp.now_playing.source == "Spotify"
         mp._apply_state({"state": "paused", "attributes": {}})
         assert mp.is_paused
+        assert not mp.is_muted
         assert mp.volume_level is None
         assert mp.now_playing.source is None
     finally:

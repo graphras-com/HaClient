@@ -202,6 +202,11 @@ class MediaPlayer(Entity):
         return self.state == "paused"
 
     @property
+    def is_muted(self) -> bool:
+        """``True`` if the media player is currently muted."""
+        return bool(self.attributes.get("is_volume_muted"))
+
+    @property
     def volume_level(self) -> float | None:
         """Current volume level (``0.0`` – ``1.0``) or ``None`` if unknown."""
         value = self.attributes.get("volume_level")

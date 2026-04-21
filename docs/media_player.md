@@ -10,6 +10,7 @@ Inherits from [`Entity`](base.md#ha_cliententityentity).
 |---|---|---|
 | `is_playing` | `bool` | Currently playing |
 | `is_paused` | `bool` | Currently paused |
+| `is_muted` | `bool` | Currently muted |
 | `volume_level` | `float \| None` | Volume (0.0–1.0) |
 | `now_playing` | `NowPlaying` | Structured snapshot of current media |
 
