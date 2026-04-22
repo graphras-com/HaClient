@@ -31,6 +31,12 @@ position.
 | `content_id` | `str \| None` | HA content ID |
 | `duration` | `int \| None` | Duration in seconds |
 | `entity_picture` | `str \| None` | Entity picture URL |
+| `queue_position` | `int \| None` | Current position in the play queue |
+| `queue_size` | `int \| None` | Total number of items in the play queue |
+| `playlist` | `str \| None` | Active playlist name (HA attr `media_playlist`) |
+| `repeat` | `str \| None` | Repeat mode (e.g. `"off"`, `"one"`, `"all"`) |
+| `next` | `bool` | `True` if the player supports skipping to next track |
+| `previous` | `bool` | `True` if the player supports skipping to previous track |
 
 ## Methods
 
@@ -63,7 +69,8 @@ position.
 | `@on_stop` | State transitions to `"idle"` | `(old_state, new_state)` |
 
 `on_media_change` fires when any of `source`, `title`, `artist`, `album`,
-`channel`, `content_type`, `content_id`, `duration`, or `entity_picture`
+`channel`, `content_type`, `content_id`, `duration`, `entity_picture`,
+`queue_position`, `queue_size`, `playlist`, `repeat`, `next`, or `previous`
 changes, but **not** when only `media_position` or
 `media_position_updated_at` changes.
 

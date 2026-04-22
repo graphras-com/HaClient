@@ -94,6 +94,8 @@ await player.next()
 # Access structured media info
 np = player.now_playing
 print(f"{np.artist} - {np.title} ({np.album})")
+print(f"Playlist: {np.playlist}  Queue: {np.queue_position}/{np.queue_size}  Repeat: {np.repeat}")
+print(f"Can skip next: {np.next}, Can skip previous: {np.previous}")
 ```
 
 ### Light control

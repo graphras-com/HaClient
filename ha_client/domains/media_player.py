@@ -25,6 +25,7 @@ _MAX_BROWSE_DEPTH = 6
 
 def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
     """Build a :class:`NowPlaying` from a raw HA attributes dict."""
+    features = attrs.get("supported_features") or 0
     return NowPlaying(
         source=attrs.get("source"),
         title=attrs.get("media_title"),
@@ -35,6 +36,12 @@ def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
         content_id=attrs.get("media_content_id"),
         duration=attrs.get("media_duration"),
         entity_picture=attrs.get("entity_picture"),
+        queue_position=attrs.get("queue_position"),
+        queue_size=attrs.get("queue_size"),
+        playlist=attrs.get("media_playlist"),
+        repeat=attrs.get("repeat"),
+        next=bool(features & 32),
+        previous=bool(features & 16),
     )
 
 
@@ -60,6 +67,12 @@ class NowPlaying:
     content_id: str | None = None
     duration: int | None = None
     entity_picture: str | None = None
+    queue_position: int | None = None
+    queue_size: int | None = None
+    playlist: str | None = None
+    repeat: str | None = None
+    next: bool = False
+    previous: bool = False
 
 
 class FavoriteItem:
@@ -146,7 +159,8 @@ class MediaPlayer(Entity):
         """Register a listener for when the playing media changes.
 
         Fires when any identity attribute changes (source, title, artist,
-        album, channel, content_type, content_id, duration, entity_picture)
+        album, channel, content_type, content_id, duration, entity_picture,
+        queue_position, queue_size, playlist, repeat, next, previous)
         but **not** on position/progress updates.
 
         Callback: ``(old: NowPlaying, new: NowPlaying)``.
