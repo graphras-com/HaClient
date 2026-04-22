@@ -1,5 +1,38 @@
 # AGENTS.md
 
+## Workflow
+
+All work MUST be done on a feature branch — never commit directly to `main`.
+
+1. **Create a branch** from `main` before starting any work:
+   ```bash
+   git checkout main && git pull
+   git checkout -b <type>/<short-description>   # e.g. feat/add-fan-domain, fix/ws-reconnect
+   ```
+2. **Implement the change** — code, tests, and documentation (see checklists below).
+3. **Run the full check suite** (lint → type-check → tests) and ensure it passes.
+4. **Commit and push** the branch:
+   ```bash
+   git add -A && git commit -m "<descriptive message>"
+   git push -u origin HEAD
+   ```
+5. **Create a Pull Request** against `main`:
+   ```bash
+   gh pr create --fill
+   ```
+
+### Change Checklist
+
+Every change MUST include **all** of the following:
+
+- [ ] **Tests** — new or updated tests covering the change with **≥ 95% coverage** for affected modules. Verify with:
+  ```bash
+  pytest --cov=ha_client --cov-report=term-missing --cov-fail-under=95
+  ```
+- [ ] **Documentation** — update relevant files in `docs/` to reflect the change (new features get a new or updated doc page).
+- [ ] **README.md** — update the project README if the change affects public API, installation, usage examples, or feature list.
+- [ ] **Lint & type-check pass** — `ruff check .` and `mypy ha_client/` must be clean.
+
 ## Setup
 
 ```bash
@@ -18,8 +51,8 @@ ruff check .
 # Type-check (strict mode)
 mypy ha_client/
 
-# Tests with coverage (target ≥90%)
-pytest --cov=ha_client --cov-report=term-missing
+# Tests with coverage (target ≥95%)
+pytest --cov=ha_client --cov-report=term-missing --cov-fail-under=95
 
 # Single test file
 pytest tests/test_client.py
