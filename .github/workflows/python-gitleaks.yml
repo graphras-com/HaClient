@@ -1,0 +1,24 @@
+name: Reusable Gitleaks
+
+on:
+  workflow_call:
+    secrets:
+      GITLEAKS_LICENSE:
+        required: false
+
+jobs:
+  scan:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

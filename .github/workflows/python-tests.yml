@@ -1,0 +1,85 @@
+name: Reusable Python Tests
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions.
+        required: false
+        type: string
+        default: '["3.11","3.12","3.13"]'
+      install-spec:
+        description: Pip install spec, e.g. .[dev]
+        required: false
+        type: string
+        default: ".[dev]"
+      coverage-target:
+        description: Coverage target path (empty disables coverage flags).
+        required: false
+        type: string
+        default: ""
+      coverage-threshold:
+        description: Coverage fail-under percentage.
+        required: false
+        type: number
+        default: 85
+      pytest-args:
+        description: Additional pytest args.
+        required: false
+        type: string
+        default: "-q"
+      install-node:
+        description: Whether to install Node.js before tests.
+        required: false
+        type: boolean
+        default: false
+      node-version:
+        description: Node.js version if install-node is true.
+        required: false
+        type: string
+        default: "20"
+
+jobs:
+  pytest:
+    name: Pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Setup Node.js
+        if: ${{ inputs.install-node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "${{ inputs.install-spec }}"
+          python -m pip install pytest-cov
+
+      - name: Run tests with coverage
+        if: ${{ inputs.coverage-target != '' }}
+        run: |
+          python -m pytest \
+            --cov=${{ inputs.coverage-target }} \
+            --cov-report=term-missing \
+            --cov-fail-under=${{ inputs.coverage-threshold }} \
+            ${{ inputs.pytest-args }}
+
+      - name: Run tests without coverage
+        if: ${{ inputs.coverage-target == '' }}
+        run: python -m pytest ${{ inputs.pytest-args }}
