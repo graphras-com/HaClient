@@ -11,9 +11,7 @@ from ha_client import HAClient
 from .fake_ha import FakeHA
 
 
-def _find_call(
-    fake_ha: FakeHA, service: str
-) -> dict[str, Any]:
+def _find_call(fake_ha: FakeHA, service: str) -> dict[str, Any]:
     for call in fake_ha.ws_service_calls:
         if call["service"] == service:
             return call

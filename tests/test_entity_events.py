@@ -18,9 +18,7 @@ async def test_state_change_decorator_sync(client: HAClient, fake_ha: FakeHA) ->
     def handler(old: Any, new: Any) -> None:
         captured.append((old, new))
 
-    await fake_ha.push_state_changed(
-        "light.kitchen", {"state": "on", "attributes": {}}, None
-    )
+    await fake_ha.push_state_changed("light.kitchen", {"state": "on", "attributes": {}}, None)
     await asyncio.sleep(0.05)
     assert len(captured) == 1
     assert captured[0][1]["state"] == "on"
@@ -89,7 +87,5 @@ async def test_state_change_for_unknown_entity_is_ignored(
     client: HAClient, fake_ha: FakeHA
 ) -> None:
     # Nothing registered for switch.mystery; event dispatch must not explode.
-    await fake_ha.push_state_changed(
-        "switch.mystery", {"state": "on", "attributes": {}}
-    )
+    await fake_ha.push_state_changed("switch.mystery", {"state": "on", "attributes": {}})
     await asyncio.sleep(0.05)

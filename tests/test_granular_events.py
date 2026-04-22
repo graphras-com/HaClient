@@ -176,9 +176,7 @@ async def test_media_player_now_playing_property(client: HAClient, fake_ha: Fake
     assert np.duration == 597
 
 
-async def test_media_player_remove_media_change_listener(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_media_player_remove_media_change_listener(client: HAClient, fake_ha: FakeHA) -> None:
     player = client.media_player("living_room")
     calls = 0
 
@@ -468,9 +466,7 @@ async def test_climate_on_hvac_mode_change(client: HAClient, fake_ha: FakeHA) ->
     assert captured == [("heat", "cool")]
 
 
-async def test_climate_on_hvac_mode_not_fired_when_same(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_climate_on_hvac_mode_not_fired_when_same(client: HAClient, fake_ha: FakeHA) -> None:
     climate = client.climate("thermostat")
     captured: list[tuple[Any, Any]] = []
 
@@ -504,9 +500,7 @@ async def test_climate_on_temperature_change(client: HAClient, fake_ha: FakeHA) 
     assert captured == [(21.0, 22.5)]
 
 
-async def test_climate_on_target_temperature_change(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_climate_on_target_temperature_change(client: HAClient, fake_ha: FakeHA) -> None:
     climate = client.climate("thermostat")
     captured: list[tuple[Any, Any]] = []
 
@@ -670,9 +664,7 @@ async def test_remove_state_value_listener(client: HAClient, fake_ha: FakeHA) ->
     assert calls == 0
 
 
-async def test_granular_handler_exception_logged(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_granular_handler_exception_logged(client: HAClient, fake_ha: FakeHA) -> None:
     """A handler that raises does not break other handlers."""
     player = client.media_player("living_room")
     captured: list[Any] = []
@@ -694,9 +686,7 @@ async def test_granular_handler_exception_logged(
     assert captured == [0.9]
 
 
-async def test_state_transition_not_fired_on_same_state(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_state_transition_not_fired_on_same_state(client: HAClient, fake_ha: FakeHA) -> None:
     """State transition listener does not fire if state doesn't change."""
     light = client.light("kitchen")
     calls = 0

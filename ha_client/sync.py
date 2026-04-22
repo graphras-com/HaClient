@@ -36,9 +36,7 @@ class _LoopThread:
 
     def __init__(self) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._run, name="ha-client-sync-loop", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="ha-client-sync-loop", daemon=True)
         self._started = threading.Event()
         self._thread.start()
         self._started.wait()
@@ -54,9 +52,7 @@ class _LoopThread:
                 for task in pending:
                     task.cancel()
                 if pending:
-                    self.loop.run_until_complete(
-                        asyncio.gather(*pending, return_exceptions=True)
-                    )
+                    self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             finally:
                 self.loop.close()
 
@@ -144,13 +140,9 @@ class SyncHAClient:
         self.close()
 
     # ------------------------------------------------------- service helpers
-    def call_service(
-        self, domain: str, service: str, data: dict[str, Any] | None = None
-    ) -> Any:
+    def call_service(self, domain: str, service: str, data: dict[str, Any] | None = None) -> Any:
         """Invoke a Home Assistant service synchronously."""
-        return self._loop_thread.submit(
-            self._client.call_service(domain, service, data)
-        )
+        return self._loop_thread.submit(self._client.call_service(domain, service, data))
 
     def refresh_all(self) -> None:
         """Refresh all registered entities synchronously."""
@@ -184,6 +176,3 @@ class SyncHAClient:
     def binary_sensor(self, name: str) -> Any:
         """Return a sync proxy wrapping the async :class:`BinarySensor`."""
         return _SyncProxy(self._client.binary_sensor(name), self._loop_thread)
-
-
-

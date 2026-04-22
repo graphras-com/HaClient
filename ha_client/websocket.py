@@ -132,9 +132,7 @@ class WebSocketClient:
         # Auth handshake: auth_required -> auth -> auth_ok | auth_invalid
         msg = await self._recv_json()
         if msg.get("type") != "auth_required":
-            raise AuthenticationError(
-                f"Expected auth_required, got {msg.get('type')!r}"
-            )
+            raise AuthenticationError(f"Expected auth_required, got {msg.get('type')!r}")
         await self._ws.send_json({"type": "auth", "access_token": self._token})
         msg = await self._recv_json()
         mtype = msg.get("type")
@@ -233,9 +231,7 @@ class WebSocketClient:
             )
         except TimeoutError as err:
             self._pending.pop(cmd_id, None)
-            raise HATimeoutError(
-                f"Timed out waiting for response to command id={cmd_id}"
-            ) from err
+            raise HATimeoutError(f"Timed out waiting for response to command id={cmd_id}") from err
         finally:
             self._pending.pop(cmd_id, None)
         return result
@@ -274,9 +270,7 @@ class WebSocketClient:
 
     async def unsubscribe(self, subscription_id: int) -> None:
         """Unsubscribe a previously registered subscription."""
-        await self.send_command(
-            {"type": "unsubscribe_events", "subscription": subscription_id}
-        )
+        await self.send_command({"type": "unsubscribe_events", "subscription": subscription_id})
         self._subscriptions.pop(subscription_id, None)
         for k, (sid, _handler) in list(self._event_subs.items()):
             if sid == subscription_id:
@@ -368,9 +362,7 @@ class WebSocketClient:
         # Unhandled – log at debug for visibility in tests.
         _LOGGER.debug("Unhandled WS message: %s", mtype)
 
-    async def _invoke_handler(
-        self, handler: EventHandler, event: dict[str, Any]
-    ) -> None:
+    async def _invoke_handler(self, handler: EventHandler, event: dict[str, Any]) -> None:
         try:
             result = handler(event)
             if asyncio.iscoroutine(result):
@@ -394,9 +386,7 @@ class WebSocketClient:
                 continue
 
             # Restart background loops.
-            self._reader_task = asyncio.create_task(
-                self._reader_loop(), name="ha-ws-reader"
-            )
+            self._reader_task = asyncio.create_task(self._reader_loop(), name="ha-ws-reader")
             if self._ping_interval > 0:
                 self._keepalive_task = asyncio.create_task(
                     self._keepalive_loop(), name="ha-ws-keepalive"
@@ -406,9 +396,7 @@ class WebSocketClient:
                 try:
                     await self.subscribe_events(handler, event_type)
                 except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning(
-                        "Failed to resubscribe to %s: %s", event_type, err
-                    )
+                    _LOGGER.warning("Failed to resubscribe to %s: %s", event_type, err)
             return
 
     # ---------------------------------------------------------- keepalive

@@ -215,9 +215,7 @@ class HAClient:
             entity._apply_state(index.get(entity.entity_id))  # noqa: SLF001
 
     # --------------------------------------------------- domain accessors
-    def _get_or_create(
-        self, domain: str, name: str, cls: type[_E]
-    ) -> _E:
+    def _get_or_create(self, domain: str, name: str, cls: type[_E]) -> _E:
         entity_id = self.registry.resolve(domain, name)
         existing = self.registry.get(entity_id)
         if existing is not None:

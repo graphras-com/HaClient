@@ -39,9 +39,7 @@ class FakeHA:
         self._app.router.add_get("/api/", self._handle_ping)
         self._app.router.add_get("/api/states", self._handle_states)
         self._app.router.add_get("/api/states/{entity_id}", self._handle_state)
-        self._app.router.add_post(
-            "/api/services/{domain}/{service}", self._handle_service
-        )
+        self._app.router.add_post("/api/services/{domain}/{service}", self._handle_service)
         self._app.router.add_get("/api/websocket", self._handle_ws)
         self._runner: web.AppRunner | None = None
         self._site: web.TCPSite | None = None
@@ -151,9 +149,7 @@ class FakeHA:
                 return ws
             auth = json.loads(msg.data)
             if self.reject_auth or auth.get("access_token") != self.token:
-                await ws.send_json(
-                    {"type": "auth_invalid", "message": "invalid token"}
-                )
+                await ws.send_json({"type": "auth_invalid", "message": "invalid token"})
                 await ws.close()
                 return ws
             await ws.send_json({"type": "auth_ok", "ha_version": "2024.1.0"})
@@ -168,9 +164,7 @@ class FakeHA:
                 self.connections.remove(ws)
         return ws
 
-    async def _dispatch(
-        self, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+    async def _dispatch(self, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         mtype = msg.get("type", "")
         mid = msg.get("id")
 
@@ -208,9 +202,7 @@ class FakeHA:
             )
             return
         if mtype == "media_player/browse_media":
-            await ws.send_json(
-                {"id": mid, "type": "result", "success": True, "result": {}}
-            )
+            await ws.send_json({"id": mid, "type": "result", "success": True, "result": {}})
             return
 
         # Unknown command – send an error result so callers see a failure.

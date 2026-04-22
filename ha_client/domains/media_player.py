@@ -356,9 +356,7 @@ class MediaPlayer(Entity):
         # "Favorites" directory; its title is not useful as a category. We
         # therefore only start inheriting the parent's title as the category
         # once we are at least one level deep.
-        async def walk(
-            node: dict[str, Any], depth: int, category: str | None
-        ) -> None:
+        async def walk(node: dict[str, Any], depth: int, category: str | None) -> None:
             nonlocal node_count
             if node_count >= max_nodes:
                 return
@@ -379,11 +377,7 @@ class MediaPlayer(Entity):
                 thumbnail = child.get("thumbnail")
                 media_class = child.get("media_class")
 
-                if (
-                    can_play
-                    and isinstance(content_id, str)
-                    and isinstance(content_type, str)
-                ):
+                if can_play and isinstance(content_id, str) and isinstance(content_type, str):
                     key = (content_type, content_id)
                     if key not in seen:
                         seen.add(key)
@@ -393,20 +387,10 @@ class MediaPlayer(Entity):
                                 media_content_id=content_id,
                                 media_content_type=content_type,
                                 player=self,
-                                thumbnail=(
-                                    thumbnail if isinstance(thumbnail, str) else None
-                                ),
+                                thumbnail=(thumbnail if isinstance(thumbnail, str) else None),
                                 category=category
-                                or (
-                                    media_class
-                                    if isinstance(media_class, str)
-                                    else None
-                                ),
-                                media_class=(
-                                    media_class
-                                    if isinstance(media_class, str)
-                                    else None
-                                ),
+                                or (media_class if isinstance(media_class, str) else None),
+                                media_class=(media_class if isinstance(media_class, str) else None),
                             )
                         )
 
@@ -432,9 +416,7 @@ class MediaPlayer(Entity):
                     # At depth 0 the child *is* a top-level folder like
                     # "Radio" / "Albums" / "Playlists" and its title becomes
                     # the category for everything underneath.
-                    child_category = (
-                        str(title) if title else category
-                    )
+                    child_category = str(title) if title else category
                     await walk(sub, depth + 1, child_category)
 
         await walk(root, 0, None)

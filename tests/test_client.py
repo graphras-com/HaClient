@@ -53,9 +53,7 @@ async def test_call_service_via_websocket(client: HAClient, fake_ha: FakeHA) -> 
     assert call["service_data"]["transition"] == 2.0
 
 
-async def test_state_changed_dispatches_to_entity(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_state_changed_dispatches_to_entity(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
     await fake_ha.push_state_changed(
         "light.kitchen",
@@ -102,9 +100,7 @@ async def test_refresh_all(client: HAClient, fake_ha: FakeHA) -> None:
     assert sensor.unit_of_measurement == "°C"
 
 
-async def test_refresh_all_marks_missing_unavailable(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_refresh_all_marks_missing_unavailable(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
     # states is empty → entity should become unavailable
     await client.refresh_all()
@@ -123,14 +119,10 @@ async def test_call_service_via_rest_fallback(fake_ha: FakeHA) -> None:
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
     # Do NOT connect – WS is not up, so a call_service(use_websocket=False) routes via REST.
     try:
-        await ha.call_service(
-            "switch", "toggle", {"entity_id": "switch.x"}, use_websocket=False
-        )
+        await ha.call_service("switch", "toggle", {"entity_id": "switch.x"}, use_websocket=False)
     finally:
         await ha.close()
-    assert fake_ha.rest_service_calls == [
-        ("switch", "toggle", {"entity_id": "switch.x"})
-    ]
+    assert fake_ha.rest_service_calls == [("switch", "toggle", {"entity_id": "switch.x"})]
 
 
 async def test_invalid_entity_id_direct_construction() -> None:
@@ -188,9 +180,7 @@ async def test_initial_state_fetch_includes_non_string_entity_id(
         await ha.close()
 
 
-async def test_initial_state_fetch_failure_is_logged(
-    fake_ha: FakeHA, caplog: Any
-) -> None:
+async def test_initial_state_fetch_failure_is_logged(fake_ha: FakeHA, caplog: Any) -> None:
     # Break REST auth so initial /api/states fails; connect should still succeed.
     ha = HAClient(fake_ha.base_url, "wrong-token", ping_interval=0)
     # But WS auth needs the real token, so use a different strategy: point REST at

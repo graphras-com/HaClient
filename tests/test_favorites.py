@@ -99,9 +99,7 @@ def _make_playlist_a() -> dict[str, Any]:
     }
 
 
-async def _browse_handler(
-    server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-) -> None:
+async def _browse_handler(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
     content_id = msg.get("media_content_id")
     if content_id is None:
         result = _make_tree()
@@ -111,9 +109,7 @@ async def _browse_handler(
         result = _make_playlist_a()
     else:
         result = {"children": []}
-    await ws.send_json(
-        {"id": msg["id"], "type": "result", "success": True, "result": result}
-    )
+    await ws.send_json({"id": msg["id"], "type": "result", "success": True, "result": result})
 
 
 async def test_favorites_flattens_tree(client: HAClient, fake_ha: FakeHA) -> None:
@@ -148,12 +144,8 @@ async def test_favorites_item_play(client: HAClient, fake_ha: FakeHA) -> None:
     assert "FavoriteItem" in repr(playlist)
 
 
-async def test_favorites_returns_empty_when_unsupported(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
-    async def not_supported(
-        server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+async def test_favorites_returns_empty_when_unsupported(client: HAClient, fake_ha: FakeHA) -> None:
+    async def not_supported(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         await ws.send_json(
             {
                 "id": msg["id"],
@@ -191,12 +183,8 @@ async def test_favorites_max_nodes(client: HAClient, fake_ha: FakeHA) -> None:
     assert all(isinstance(f.title, str) for f in result)
 
 
-async def test_favorites_subtree_failure_is_tolerated(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
-    async def partial(
-        server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+async def test_favorites_subtree_failure_is_tolerated(client: HAClient, fake_ha: FakeHA) -> None:
+    async def partial(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         content_id = msg.get("media_content_id")
         if content_id is None:
             await ws.send_json(
@@ -354,14 +342,10 @@ async def _sonos_browse_handler(
         result = _make_sonos_playlists()
     else:
         result = {"children": []}
-    await ws.send_json(
-        {"id": msg["id"], "type": "result", "success": True, "result": result}
-    )
+    await ws.send_json({"id": msg["id"], "type": "result", "success": True, "result": result})
 
 
-async def test_favorites_captures_category_and_thumbnail(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_favorites_captures_category_and_thumbnail(client: HAClient, fake_ha: FakeHA) -> None:
     """Each favorite should expose thumbnail + category (parent folder title)."""
     fake_ha.handlers["media_player/browse_media"] = _sonos_browse_handler
     mp = client.media_player("livingroom")
@@ -385,9 +369,7 @@ async def test_favorites_captures_category_and_thumbnail(
     assert chill.media_class == "playlist"
 
 
-async def test_favorites_repr_includes_new_fields(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
+async def test_favorites_repr_includes_new_fields(client: HAClient, fake_ha: FakeHA) -> None:
     fake_ha.handlers["media_player/browse_media"] = _sonos_browse_handler
     mp = client.media_player("livingroom")
     favs = await mp.favorites()
@@ -398,12 +380,8 @@ async def test_favorites_repr_includes_new_fields(
     assert "https://example.com/arthur.jpg" in text
 
 
-async def test_browse_media_malformed_response(
-    client: HAClient, fake_ha: FakeHA
-) -> None:
-    async def bad(
-        server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+async def test_browse_media_malformed_response(client: HAClient, fake_ha: FakeHA) -> None:
+    async def bad(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         await ws.send_json(
             {
                 "id": msg["id"],

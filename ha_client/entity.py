@@ -94,9 +94,7 @@ class Entity:
 
         # State transition listeners (fire when state transitions TO a value)
         if old_state_str != new_state_str and new_state_str is not None:
-            for listener in list(
-                self._state_transition_listeners.get(new_state_str, [])
-            ):
+            for listener in list(self._state_transition_listeners.get(new_state_str, [])):
                 self._schedule_value(listener, old_state_str, new_state_str)
 
         # Attribute listeners

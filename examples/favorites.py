@@ -11,6 +11,7 @@ from ha_client import HAClient
 
 load_dotenv()
 
+
 async def main() -> None:
     url = os.environ["HA_URL"]
     token = os.environ["HA_TOKEN"]
@@ -20,9 +21,9 @@ async def main() -> None:
         favs = await player.favorites()
         for fav in favs:
             print(fav)
-            #print(f"  {fav.media_content_type}: {fav.title}")
+            # print(f"  {fav.media_content_type}: {fav.title}")
 
-        #if favs:
+        # if favs:
         #    print(f"Playing: {favs[0].title}")
         #    #await favs[0].play()
 

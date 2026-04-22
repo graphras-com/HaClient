@@ -90,9 +90,7 @@ class RestClient:
                     raise AuthenticationError("Invalid or expired access token")
                 if resp.status >= 400:
                     body = await resp.text()
-                    raise HAClientError(
-                        f"HTTP {resp.status} from {method} {path}: {body.strip()}"
-                    )
+                    raise HAClientError(f"HTTP {resp.status} from {method} {path}: {body.strip()}")
                 if resp.status == 200 and resp.content_type == "application/json":
                     return await resp.json()
                 return await resp.text()
@@ -139,9 +137,7 @@ class RestClient:
         returns this list directly in the response body.
         """
         payload = data or {}
-        result = await self._request(
-            "POST", f"/api/services/{domain}/{service}", json=payload
-        )
+        result = await self._request("POST", f"/api/services/{domain}/{service}", json=payload)
         if isinstance(result, list):
             return result
         return []

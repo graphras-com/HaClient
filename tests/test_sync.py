@@ -44,9 +44,7 @@ def _run_sync_in_thread(fake_ha: FakeHA) -> dict[str, object]:
 async def test_sync_client_basic_operations(fake_ha: FakeHA) -> None:
     # Run the sync client in a thread while the fake server runs on the
     # main asyncio loop.
-    results = await asyncio.get_running_loop().run_in_executor(
-        None, _run_sync_in_thread, fake_ha
-    )
+    results = await asyncio.get_running_loop().run_in_executor(None, _run_sync_in_thread, fake_ha)
     calls = results["calls"]
     assert isinstance(calls, list)
     services = [c["service"] for c in calls]

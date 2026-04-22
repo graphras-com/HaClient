@@ -231,9 +231,7 @@ async def test_cannot_connect_to_bad_port() -> None:
 
 
 async def test_subscribe_events_failure_rolls_back(fake_ha: FakeHA) -> None:
-    async def reject(
-        server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+    async def reject(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         await ws.send_json(
             {
                 "id": msg["id"],
@@ -260,9 +258,7 @@ async def test_subscribe_events_failure_rolls_back(fake_ha: FakeHA) -> None:
 
 
 async def test_close_cancels_pending_request(fake_ha: FakeHA) -> None:
-    async def never_reply(
-        server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
-    ) -> None:
+    async def never_reply(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
         await asyncio.sleep(10)
 
     fake_ha.handlers["slow"] = never_reply
@@ -299,6 +295,7 @@ async def test_reader_handles_non_json_text_frame(fake_ha: FakeHA) -> None:
 
 async def test_keepalive_triggers_reconnect(fake_ha: FakeHA) -> None:
     """If the ping times out, the socket gets force-closed and reconnect kicks in."""
+
     # Override ping so the server never responds to it.
     async def slow_ping(server: FakeHA, ws: Any, msg: dict[str, Any]) -> None:
         await asyncio.sleep(10)
@@ -577,6 +574,7 @@ async def test_dispatch_result_no_pending_future(fake_ha: FakeHA) -> None:
 
 async def test_close_cancels_pong_waiters(fake_ha: FakeHA) -> None:
     """Closing while a ping is in-flight fails the pong future."""
+
     async def slow_pong(
         server: FakeHA, ws_resp: web.WebSocketResponse, msg: dict[str, Any]
     ) -> None:
