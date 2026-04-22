@@ -14,11 +14,17 @@ class BinarySensor(Entity):
 
     # --------------------------------------------------------------- events
     def on_turn_on(self, func: Any) -> Any:
-        """Register a listener for when the sensor activates. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when the sensor activates.
+
+        Callback: ``(old_state, new_state)``.
+        """
         return self._register_state_transition_listener("on", func)
 
     def on_turn_off(self, func: Any) -> Any:
-        """Register a listener for when the sensor deactivates. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when the sensor deactivates.
+
+        Callback: ``(old_state, new_state)``.
+        """
         return self._register_state_transition_listener("off", func)
 
     @property

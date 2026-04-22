@@ -10,7 +10,6 @@ from ha_client.domains.media_player import NowPlaying
 
 from .fake_ha import FakeHA
 
-
 # ============================================================ MediaPlayer
 
 
@@ -96,8 +95,14 @@ async def test_media_player_on_media_change_title(client: HAClient, fake_ha: Fak
 
     await fake_ha.push_state_changed(
         "media_player.living_room",
-        {"state": "playing", "attributes": {"media_title": "Lazarus", "media_artist": "David Bowie"}},
-        {"state": "playing", "attributes": {"media_title": "Heroes", "media_artist": "David Bowie"}},
+        {
+            "state": "playing",
+            "attributes": {"media_title": "Lazarus", "media_artist": "David Bowie"},
+        },
+        {
+            "state": "playing",
+            "attributes": {"media_title": "Heroes", "media_artist": "David Bowie"},
+        },
     )
     await asyncio.sleep(0.05)
     assert len(captured) == 1

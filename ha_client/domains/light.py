@@ -18,7 +18,10 @@ class Light(Entity):
         return self._register_state_transition_listener("on", func)
 
     def on_turn_off(self, func: Any) -> Any:
-        """Register a listener for when the light turns off. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when the light turns off.
+
+        Callback: ``(old_state, new_state)``.
+        """
         return self._register_state_transition_listener("off", func)
 
     def on_brightness_change(self, func: Any) -> Any:

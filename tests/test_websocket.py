@@ -12,6 +12,7 @@ from ha_client.exceptions import (
     AuthenticationError,
     CommandError,
     ConnectionClosedError,
+    HAClientError,
 )
 from ha_client.exceptions import TimeoutError as HATimeoutError
 from ha_client.websocket import WebSocketClient
@@ -322,3 +323,273 @@ async def test_keepalive_triggers_reconnect(fake_ha: FakeHA) -> None:
         # Either reconnected or at least we exercised the timeout path.
     finally:
         await ws.close()
+
+
+async def test_recv_json_close_frame(fake_ha: FakeHA) -> None:
+    """_recv_json raises ConnectionClosedError on CLOSE frames during handshake."""
+    # Use drop_on_command to close the WS before auth completes isn't enough,
+    # we need to close before sending auth_required. Use reject + close approach.
+    # Simplest: start a separate aiohttp server for this test.
+    app = web.Application()
+
+    async def close_immediately(request: web.Request) -> web.WebSocketResponse:
+        ws_resp = web.WebSocketResponse()
+        await ws_resp.prepare(request)
+        await ws_resp.close()
+        return ws_resp
+
+    app.router.add_get("/api/websocket", close_immediately)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+    try:
+        ws = WebSocketClient(
+            f"ws://127.0.0.1:{port}/api/websocket",
+            "token",
+            ping_interval=0,
+            reconnect=False,
+        )
+        with pytest.raises(ConnectionClosedError):
+            await ws.connect()
+        await ws.close()
+    finally:
+        await runner.cleanup()
+
+
+async def test_recv_json_error_frame(fake_ha: FakeHA) -> None:
+    """_recv_json raises HAClientError on binary (unexpected type) WS messages."""
+    app = web.Application()
+
+    async def send_binary(request: web.Request) -> web.WebSocketResponse:
+        ws_resp = web.WebSocketResponse()
+        await ws_resp.prepare(request)
+        await ws_resp.send_bytes(b"binary")
+        return ws_resp
+
+    app.router.add_get("/api/websocket", send_binary)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+    try:
+        ws = WebSocketClient(
+            f"ws://127.0.0.1:{port}/api/websocket",
+            "token",
+            ping_interval=0,
+            reconnect=False,
+        )
+        with pytest.raises(HAClientError):
+            await ws.connect()
+        await ws.close()
+    finally:
+        await runner.cleanup()
+
+
+async def test_unexpected_auth_response(fake_ha: FakeHA) -> None:
+    """_do_connect raises AuthenticationError for non auth_ok/auth_invalid responses."""
+    app = web.Application()
+
+    async def weird_auth(request: web.Request) -> web.WebSocketResponse:
+        ws_resp = web.WebSocketResponse()
+        await ws_resp.prepare(request)
+        await ws_resp.send_json({"type": "auth_required", "ha_version": "2024.1.0"})
+        await ws_resp.receive()
+        await ws_resp.send_json({"type": "something_weird"})
+        return ws_resp
+
+    app.router.add_get("/api/websocket", weird_auth)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+    try:
+        ws = WebSocketClient(
+            f"ws://127.0.0.1:{port}/api/websocket",
+            "token",
+            ping_interval=0,
+            reconnect=False,
+        )
+        with pytest.raises(AuthenticationError):
+            await ws.connect()
+        await ws.close()
+    finally:
+        await runner.cleanup()
+
+
+async def test_not_auth_required_response(fake_ha: FakeHA) -> None:
+    """_do_connect raises AuthenticationError if first msg is not auth_required."""
+    app = web.Application()
+
+    async def no_auth_required(request: web.Request) -> web.WebSocketResponse:
+        ws_resp = web.WebSocketResponse()
+        await ws_resp.prepare(request)
+        await ws_resp.send_json({"type": "other"})
+        return ws_resp
+
+    app.router.add_get("/api/websocket", no_auth_required)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+    try:
+        ws = WebSocketClient(
+            f"ws://127.0.0.1:{port}/api/websocket",
+            "token",
+            ping_interval=0,
+            reconnect=False,
+        )
+        with pytest.raises(AuthenticationError):
+            await ws.connect()
+        await ws.close()
+    finally:
+        await runner.cleanup()
+
+
+async def test_reader_loop_ws_error_type(fake_ha: FakeHA) -> None:
+    """Reader loop breaks on WSMsgType.ERROR."""
+    ws = await _make_ws(fake_ha, reconnect=False)
+    disconnected = asyncio.Event()
+
+    @ws.on_disconnect
+    async def _on_dc() -> None:
+        disconnected.set()
+
+    # Force-close server connections to trigger error/close in reader.
+    for conn in list(fake_ha.connections):
+        await conn.close()
+
+    await asyncio.wait_for(disconnected.wait(), timeout=3)
+    await ws.close()
+
+
+async def test_connect_already_connected(fake_ha: FakeHA) -> None:
+    """Calling connect() when already connected is a no-op."""
+    ws = await _make_ws(fake_ha)
+    try:
+        assert ws.connected
+        await ws.connect()  # should return immediately
+        assert ws.connected
+    finally:
+        await ws.close()
+
+
+async def test_ping_while_disconnected(fake_ha: FakeHA) -> None:
+    """Ping raises ConnectionClosedError when not connected."""
+    ws = WebSocketClient(fake_ha.ws_url, fake_ha.token, ping_interval=0, reconnect=False)
+    with pytest.raises(ConnectionClosedError):
+        await ws.ping()
+
+
+async def test_reconnect_failure_retries(fake_ha: FakeHA) -> None:
+    """Reconnect loop retries on connection failure."""
+    ws = await _make_ws(fake_ha, reconnect=True)
+    try:
+        # Kill server connections and make auth fail temporarily.
+        fake_ha.reject_auth = True
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        # Let it try a couple of reconnects (which will fail).
+        await asyncio.sleep(1.5)
+
+        # Now allow auth again.
+        fake_ha.reject_auth = False
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if ws.connected:
+                break
+        assert ws.connected
+    finally:
+        await ws.close()
+
+
+async def test_keepalive_error_path(fake_ha: FakeHA) -> None:
+    """Keepalive loop handles non-timeout errors gracefully."""
+    # Make ping raise a generic exception (not timeout).
+    call_count = 0
+
+    async def error_ping(
+        server: FakeHA, ws_resp: web.WebSocketResponse, msg: dict[str, Any]
+    ) -> None:
+        nonlocal call_count
+        call_count += 1
+        # Send back an error result instead of pong.
+        await ws_resp.send_json(
+            {
+                "id": msg["id"],
+                "type": "result",
+                "success": False,
+                "error": {"code": "error", "message": "fail"},
+            }
+        )
+
+    fake_ha.handlers["ping"] = error_ping
+    ws = WebSocketClient(
+        fake_ha.ws_url,
+        fake_ha.token,
+        ping_interval=0.2,
+        request_timeout=0.5,
+        reconnect=False,
+    )
+    await ws.connect()
+    try:
+        await asyncio.sleep(0.8)
+        # The keepalive loop should have hit the error path.
+        assert call_count >= 1
+    finally:
+        await ws.close()
+
+
+async def test_dispatch_unhandled_message_type(fake_ha: FakeHA) -> None:
+    """Unhandled WS message types are logged but don't crash."""
+    ws = await _make_ws(fake_ha, reconnect=False)
+    try:
+        # Send a message with an unknown type directly from server.
+        for conn in fake_ha.connections:
+            if not conn.closed:
+                await conn.send_json({"type": "unknown_thing", "id": 999})
+        await asyncio.sleep(0.05)
+        # Client should still be connected.
+        assert ws.connected
+    finally:
+        await ws.close()
+
+
+async def test_dispatch_result_no_pending_future(fake_ha: FakeHA) -> None:
+    """A result message with no matching pending future is silently ignored."""
+    ws = await _make_ws(fake_ha, reconnect=False)
+    try:
+        for conn in fake_ha.connections:
+            if not conn.closed:
+                await conn.send_json(
+                    {"id": 99999, "type": "result", "success": True, "result": None}
+                )
+        await asyncio.sleep(0.05)
+        assert ws.connected
+    finally:
+        await ws.close()
+
+
+async def test_close_cancels_pong_waiters(fake_ha: FakeHA) -> None:
+    """Closing while a ping is in-flight fails the pong future."""
+    async def slow_pong(
+        server: FakeHA, ws_resp: web.WebSocketResponse, msg: dict[str, Any]
+    ) -> None:
+        await asyncio.sleep(10)
+
+    fake_ha.handlers["ping"] = slow_pong
+    ws = await _make_ws(fake_ha)
+
+    async def do_ping() -> None:
+        with pytest.raises((ConnectionClosedError, HATimeoutError)):
+            await ws.ping(timeout=5.0)
+
+    task = asyncio.create_task(do_ping())
+    await asyncio.sleep(0.1)
+    await ws.close()
+    await task

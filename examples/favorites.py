@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+
 from dotenv import load_dotenv
 
 from ha_client import HAClient
