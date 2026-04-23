@@ -18,7 +18,6 @@ from ..exceptions import CommandError, HAClientError
 
 _LOGGER = logging.getLogger(__name__)
 
-# Safety cap so that misbehaving integrations cannot send us into a huge tree.
 _MAX_BROWSE_NODES = 2000
 _MAX_BROWSE_DEPTH = 6
 
@@ -146,7 +145,6 @@ class MediaPlayer(Entity):
         super().__init__(entity_id, client)
         self._media_change_listeners: list[ValueChangeHandler] = []
 
-    # --------------------------------------------------------------- events
     def on_volume_change(self, func: Any) -> Any:
         """Register a listener for volume level changes. Callback: ``(old, new)``."""
         return self._register_attr_listener("volume_level", func)
@@ -204,7 +202,6 @@ class MediaPlayer(Entity):
             return
         super().remove_granular_listener(func)
 
-    # ------------------------------------------------------------------ state
     @property
     def is_playing(self) -> bool:
         """``True`` if the media player is currently playing."""
@@ -231,7 +228,6 @@ class MediaPlayer(Entity):
         """Structured snapshot of the currently playing media."""
         return _now_playing_from_attrs(self.attributes)
 
-    # ------------------------------------------------------------- playback
     async def play(self) -> None:
         """Resume / start playback."""
         await self.call_service("media_play")
@@ -292,7 +288,6 @@ class MediaPlayer(Entity):
         }
         await self.call_service("play_media", data)
 
-    # ------------------------------------------------------------- favorites
     async def browse_media(
         self,
         media_content_type: str | None = None,
@@ -352,10 +347,6 @@ class MediaPlayer(Entity):
         seen: set[tuple[str, str]] = set()
         node_count = 0
 
-        # The "root" node for a favorites browse is typically a generic
-        # "Favorites" directory; its title is not useful as a category. We
-        # therefore only start inheriting the parent's title as the category
-        # once we are at least one level deep.
         async def walk(node: dict[str, Any], depth: int, category: str | None) -> None:
             nonlocal node_count
             if node_count >= max_nodes:
@@ -412,10 +403,6 @@ class MediaPlayer(Entity):
                         continue
                     except asyncio.CancelledError:
                         raise
-                    # Pass the child's title as category for its descendants.
-                    # At depth 0 the child *is* a top-level folder like
-                    # "Radio" / "Albums" / "Playlists" and its title becomes
-                    # the category for everything underneath.
                     child_category = str(title) if title else category
                     await walk(sub, depth + 1, child_category)
 

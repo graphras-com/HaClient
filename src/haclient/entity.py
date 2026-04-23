@@ -25,7 +25,7 @@ V = TypeVar("V", bound=ValueChangeHandler)
 
 
 class Entity:
-    """Represents a single Home Assistant entity.
+    """Represent a single Home Assistant entity.
 
     Subclasses map to specific domains (``media_player``, ``light``, ...) and
     should override :attr:`domain` and add domain-specific methods.
@@ -35,7 +35,7 @@ class Entity:
     client receives ``state_changed`` events for this entity.
     """
 
-    domain: str = ""  # overridden by subclasses
+    domain: str = ""
 
     def __init__(self, entity_id: str, client: HAClient) -> None:
         if "." not in entity_id:
@@ -52,7 +52,6 @@ class Entity:
         self._state_value_listeners: list[ValueChangeHandler] = []
         client.registry.register(self)
 
-    # --------------------------------------------------------- state plumbing
     def _apply_state(self, state_obj: dict[str, Any] | None) -> None:
         """Apply a raw state object (as returned by Home Assistant)."""
         if state_obj is None:
@@ -68,12 +67,10 @@ class Entity:
         old_state: dict[str, Any] | None,
         new_state: dict[str, Any] | None,
     ) -> None:
-        """Internal: update local state and dispatch listeners."""
+        """Update local state and dispatch listeners."""
         self._apply_state(new_state)
-        # Generic state_change listeners
         for listener in list(self._listeners):
             self._schedule(listener, old_state, new_state)
-        # Higher-level event dispatch
         self._dispatch_granular_events(old_state, new_state)
 
     def _dispatch_granular_events(
@@ -87,17 +84,14 @@ class Entity:
         old_attrs = (old_state or {}).get("attributes") or {}
         new_attrs = (new_state or {}).get("attributes") or {}
 
-        # State value change listeners (fire when state string changes)
         if old_state_str != new_state_str:
             for listener in list(self._state_value_listeners):
                 self._schedule_value(listener, old_state_str, new_state_str)
 
-        # State transition listeners (fire when state transitions TO a value)
         if old_state_str != new_state_str and new_state_str is not None:
             for listener in list(self._state_transition_listeners.get(new_state_str, [])):
                 self._schedule_value(listener, old_state_str, new_state_str)
 
-        # Attribute listeners
         for attr_key, listeners in self._attr_listeners.items():
             old_val = old_attrs.get(attr_key)
             new_val = new_attrs.get(attr_key)
@@ -111,6 +105,7 @@ class Entity:
         old_state: dict[str, Any] | None,
         new_state: dict[str, Any] | None,
     ) -> None:
+        """Invoke a state-change handler, scheduling coroutines on the loop."""
         try:
             result = handler(old_state, new_state)
         except Exception:  # pragma: no cover - defensive
@@ -144,7 +139,6 @@ class Entity:
             else:  # pragma: no cover - only reached without running loop
                 asyncio.ensure_future(awaitable)
 
-    # ------------------------------------------------- granular event helpers
     def _register_attr_listener(self, attr_key: str, func: V) -> V:
         """Register a listener for changes to a specific attribute.
 
@@ -174,21 +168,17 @@ class Entity:
 
     def remove_granular_listener(self, func: ValueChangeHandler) -> None:
         """Remove a previously registered granular (attribute/state) listener."""
-        # Search attr listeners
         for listeners in self._attr_listeners.values():
             with contextlib.suppress(ValueError):
                 listeners.remove(func)
                 return
-        # Search state transition listeners
         for listeners in self._state_transition_listeners.values():
             with contextlib.suppress(ValueError):
                 listeners.remove(func)
                 return
-        # Search state value listeners
         with contextlib.suppress(ValueError):
             self._state_value_listeners.remove(func)
 
-    # ------------------------------------------------------------- decorators
     def on_state_change(self, func: F) -> F:
         """Register ``func`` as a listener for state changes on this entity.
 
@@ -205,7 +195,6 @@ class Entity:
         with contextlib.suppress(ValueError):
             self._listeners.remove(func)
 
-    # ----------------------------------------------------------- convenience
     @property
     def available(self) -> bool:
         """Return ``True`` if the entity is currently available."""

@@ -12,7 +12,6 @@ class BinarySensor(Entity):
 
     domain = "binary_sensor"
 
-    # --------------------------------------------------------------- events
     def on_turn_on(self, func: Any) -> Any:
         """Register a listener for when the sensor activates.
 

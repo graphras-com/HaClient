@@ -28,7 +28,7 @@ class CommandError(HAClientError):
         self.message = message
 
 
-class TimeoutError(HAClientError):  # noqa: A001 - intentional shadow of builtin
+class TimeoutError(HAClientError):  # noqa: A001
     """Raised when a request to Home Assistant does not complete in time."""
 
 

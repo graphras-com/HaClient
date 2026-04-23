@@ -12,7 +12,6 @@ class Light(Entity):
 
     domain = "light"
 
-    # --------------------------------------------------------------- events
     def on_turn_on(self, func: Any) -> Any:
         """Register a listener for when the light turns on. Callback: ``(old_state, new_state)``."""
         return self._register_state_transition_listener("on", func)
@@ -36,7 +35,6 @@ class Light(Entity):
         """Register a listener for color temperature (Kelvin) changes. Callback: ``(old, new)``."""
         return self._register_attr_listener("color_temp_kelvin", func)
 
-    # ------------------------------------------------------------------ state
     @property
     def is_on(self) -> bool:
         """``True`` if the light is currently on."""
@@ -74,7 +72,6 @@ class Light(Entity):
             return (int(value[0]), int(value[1]), int(value[2]))
         return None
 
-    # ------------------------------------------------------------------ actions
     async def turn_on(
         self,
         *,

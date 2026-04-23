@@ -45,36 +45,27 @@ class FakeHA:
         self._site: web.TCPSite | None = None
         self.port: int = 0
 
-        # Tracked per-test.
         self.rest_service_calls: list[tuple[str, str, dict[str, Any]]] = []
         self.ws_service_calls: list[dict[str, Any]] = []
         self.connections: list[web.WebSocketResponse] = []
-        # event_type -> list of subscription ids that subscribed to it
         self.subscriptions: dict[str, list[int]] = {}
 
-        # Custom command handler – keys are ``type`` strings, values are
-        # functions (server, ws, msg) -> awaitable. When set, overrides the
-        # built-in handler for that type.
         self.handlers: dict[str, CommandHandler] = {}
 
-        # Control knobs for tests.
         self.reject_auth: bool = False
-        self.drop_on_command: str | None = None  # close WS when this command arrives
+        self.drop_on_command: str | None = None
 
-    # --------------------------------------------------------------- lifecycle
     async def start(self) -> str:
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, "127.0.0.1", 0)
         await self._site.start()
-        # Figure out the port that was assigned.
         server = self._site._server  # type: ignore[attr-defined]
         assert server is not None
         self.port = server.sockets[0].getsockname()[1]
         return f"http://127.0.0.1:{self.port}"
 
     async def stop(self) -> None:
-        # Close any lingering WS sessions first.
         for ws in list(self.connections):
             if not ws.closed:
                 await ws.close()
@@ -91,7 +82,6 @@ class FakeHA:
     def ws_url(self) -> str:
         return f"ws://127.0.0.1:{self.port}/api/websocket"
 
-    # ------------------------------------------------------------------ REST
     def _check_token(self, request: web.Request) -> web.Response | None:
         if not self.require_auth:
             return None
@@ -135,13 +125,11 @@ class FakeHA:
         self.rest_service_calls.append((domain, service, payload))
         return web.json_response([])
 
-    # -------------------------------------------------------------- WebSocket
     async def _handle_ws(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.connections.append(ws)
         try:
-            # auth handshake
             await ws.send_json({"type": "auth_required", "ha_version": "2024.1.0"})
             msg = await ws.receive()
             if msg.type != WSMsgType.TEXT:
@@ -168,12 +156,10 @@ class FakeHA:
         mtype = msg.get("type", "")
         mid = msg.get("id")
 
-        # Allow tests to drop the connection mid-flight.
         if self.drop_on_command == mtype:
             await ws.close()
             return
 
-        # Custom override first.
         handler = self.handlers.get(mtype)
         if handler is not None:
             await handler(self, ws, msg)
@@ -205,7 +191,6 @@ class FakeHA:
             await ws.send_json({"id": mid, "type": "result", "success": True, "result": {}})
             return
 
-        # Unknown command – send an error result so callers see a failure.
         await ws.send_json(
             {
                 "id": mid,
@@ -215,7 +200,6 @@ class FakeHA:
             }
         )
 
-    # ------------------------------------------------------- test helpers
     async def push_event(self, event_type: str, event: dict[str, Any]) -> None:
         """Push an ``event`` to every WS currently subscribed to ``event_type``.
 
@@ -233,7 +217,6 @@ class FakeHA:
                         "event": {"event_type": event_type, **event},
                     }
                 )
-        # Small yield so receivers can process.
         await asyncio.sleep(0)
 
     async def push_state_changed(

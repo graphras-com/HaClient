@@ -86,7 +86,6 @@ async def test_get_state_reraises_non_404(fake_ha: FakeHA) -> None:
 async def test_url_normalisation(fake_ha: FakeHA) -> None:
     rc = RestClient(fake_ha.base_url, fake_ha.token)
     try:
-        # path without leading slash is prepended with /
         await rc._request("GET", "api/")
     finally:
         await rc.close()

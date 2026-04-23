@@ -96,7 +96,6 @@ async def test_subscribe_and_event(fake_ha: FakeHA) -> None:
             "state_changed",
             {"data": {"entity_id": "light.kitchen"}},
         )
-        # give reader a tick
         await asyncio.sleep(0.05)
         assert received
         assert received[0]["event_type"] == "state_changed"
@@ -123,7 +122,6 @@ async def test_reconnect_on_drop(fake_ha: FakeHA) -> None:
     """Force the server to close the WS and verify the client reconnects."""
     ws = await _make_ws(fake_ha, reconnect=True)
     try:
-        # Subscribe so we can verify re-subscription after reconnect.
         received: list[dict[str, Any]] = []
 
         async def handler(event: dict[str, Any]) -> None:
@@ -131,18 +129,15 @@ async def test_reconnect_on_drop(fake_ha: FakeHA) -> None:
 
         await ws.subscribe_events(handler, "state_changed")
 
-        # Kill the connection from the server side.
         for conn in list(fake_ha.connections):
             await conn.close()
 
-        # Wait until the reconnect loop re-establishes.
         for _ in range(50):
             await asyncio.sleep(0.1)
             if ws.connected:
                 break
         assert ws.connected
 
-        # After reconnect, push another event – handler should still fire.
         await fake_ha.push_event("state_changed", {"data": {"entity_id": "x"}})
         await asyncio.sleep(0.1)
         assert received
@@ -158,7 +153,6 @@ async def test_disconnect_listener(fake_ha: FakeHA) -> None:
     async def on_disconnect() -> None:
         called.set()
 
-    # Close from server side; client-side reader should notice.
     for conn in list(fake_ha.connections):
         await conn.close()
 
@@ -210,7 +204,6 @@ async def test_unsubscribe(fake_ha: FakeHA) -> None:
     try:
         sub_id = await ws.subscribe_events(handler, "state_changed")
         await ws.unsubscribe(sub_id)
-        # After unsubscribe the event should not be dispatched.
         await fake_ha.push_event("state_changed", {"data": {}})
         await asyncio.sleep(0.05)
         assert received == []
@@ -220,7 +213,7 @@ async def test_unsubscribe(fake_ha: FakeHA) -> None:
 
 async def test_cannot_connect_to_bad_port() -> None:
     ws = WebSocketClient(
-        "ws://127.0.0.1:1",  # port 1: nothing listening
+        "ws://127.0.0.1:1",
         "token",
         ping_interval=0,
         reconnect=False,
@@ -250,7 +243,6 @@ async def test_subscribe_events_failure_rolls_back(fake_ha: FakeHA) -> None:
     try:
         with pytest.raises(CommandError):
             await ws.subscribe_events(handler, "state_changed")
-        # Internal state should be clean again.
         assert not ws._subscriptions  # noqa: SLF001
         assert not ws._event_subs  # noqa: SLF001
     finally:
@@ -277,7 +269,7 @@ async def test_close_cancels_pending_request(fake_ha: FakeHA) -> None:
 async def test_reader_handles_non_json_text_frame(fake_ha: FakeHA) -> None:
     ws = await _make_ws(fake_ha, reconnect=False)
     try:
-        # Send a text frame that isn't JSON via a custom handler.
+
         async def send_garbage(server: FakeHA, server_ws: Any, msg: dict[str, Any]) -> None:
             await server_ws.send_str("not-json")
             await server_ws.send_json(
@@ -285,8 +277,6 @@ async def test_reader_handles_non_json_text_frame(fake_ha: FakeHA) -> None:
             )
 
         fake_ha.handlers["garbage"] = send_garbage
-        # send_command should still succeed because the garbage frame is
-        # logged & skipped.
         result = await ws.send_command({"type": "garbage"})
         assert result is None
     finally:
@@ -296,7 +286,6 @@ async def test_reader_handles_non_json_text_frame(fake_ha: FakeHA) -> None:
 async def test_keepalive_triggers_reconnect(fake_ha: FakeHA) -> None:
     """If the ping times out, the socket gets force-closed and reconnect kicks in."""
 
-    # Override ping so the server never responds to it.
     async def slow_ping(server: FakeHA, ws: Any, msg: dict[str, Any]) -> None:
         await asyncio.sleep(10)
 
@@ -310,23 +299,17 @@ async def test_keepalive_triggers_reconnect(fake_ha: FakeHA) -> None:
     )
     await ws.connect()
     try:
-        # Wait long enough for ping to time out and socket to drop.
         await asyncio.sleep(1.0)
-        # Reconnect loop should have re-established.
         for _ in range(40):
             if ws.connected:
                 break
             await asyncio.sleep(0.1)
-        # Either reconnected or at least we exercised the timeout path.
     finally:
         await ws.close()
 
 
 async def test_recv_json_close_frame(fake_ha: FakeHA) -> None:
     """_recv_json raises ConnectionClosedError on CLOSE frames during handshake."""
-    # Use drop_on_command to close the WS before auth completes isn't enough,
-    # we need to close before sending auth_required. Use reject + close approach.
-    # Simplest: start a separate aiohttp server for this test.
     app = web.Application()
 
     async def close_immediately(request: web.Request) -> web.WebSocketResponse:
@@ -456,7 +439,6 @@ async def test_reader_loop_ws_error_type(fake_ha: FakeHA) -> None:
     async def _on_dc() -> None:
         disconnected.set()
 
-    # Force-close server connections to trigger error/close in reader.
     for conn in list(fake_ha.connections):
         await conn.close()
 
@@ -469,7 +451,7 @@ async def test_connect_already_connected(fake_ha: FakeHA) -> None:
     ws = await _make_ws(fake_ha)
     try:
         assert ws.connected
-        await ws.connect()  # should return immediately
+        await ws.connect()
         assert ws.connected
     finally:
         await ws.close()
@@ -486,15 +468,12 @@ async def test_reconnect_failure_retries(fake_ha: FakeHA) -> None:
     """Reconnect loop retries on connection failure."""
     ws = await _make_ws(fake_ha, reconnect=True)
     try:
-        # Kill server connections and make auth fail temporarily.
         fake_ha.reject_auth = True
         for conn in list(fake_ha.connections):
             await conn.close()
 
-        # Let it try a couple of reconnects (which will fail).
         await asyncio.sleep(1.5)
 
-        # Now allow auth again.
         fake_ha.reject_auth = False
         for _ in range(50):
             await asyncio.sleep(0.1)
@@ -507,7 +486,6 @@ async def test_reconnect_failure_retries(fake_ha: FakeHA) -> None:
 
 async def test_keepalive_error_path(fake_ha: FakeHA) -> None:
     """Keepalive loop handles non-timeout errors gracefully."""
-    # Make ping raise a generic exception (not timeout).
     call_count = 0
 
     async def error_ping(
@@ -515,7 +493,6 @@ async def test_keepalive_error_path(fake_ha: FakeHA) -> None:
     ) -> None:
         nonlocal call_count
         call_count += 1
-        # Send back an error result instead of pong.
         await ws_resp.send_json(
             {
                 "id": msg["id"],
@@ -536,7 +513,6 @@ async def test_keepalive_error_path(fake_ha: FakeHA) -> None:
     await ws.connect()
     try:
         await asyncio.sleep(0.8)
-        # The keepalive loop should have hit the error path.
         assert call_count >= 1
     finally:
         await ws.close()
@@ -546,12 +522,10 @@ async def test_dispatch_unhandled_message_type(fake_ha: FakeHA) -> None:
     """Unhandled WS message types are logged but don't crash."""
     ws = await _make_ws(fake_ha, reconnect=False)
     try:
-        # Send a message with an unknown type directly from server.
         for conn in fake_ha.connections:
             if not conn.closed:
                 await conn.send_json({"type": "unknown_thing", "id": 999})
         await asyncio.sleep(0.05)
-        # Client should still be connected.
         assert ws.connected
     finally:
         await ws.close()

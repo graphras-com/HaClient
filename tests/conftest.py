@@ -29,7 +29,7 @@ async def client(fake_ha: FakeHA) -> AsyncIterator[HAClient]:
     ha = HAClient(
         fake_ha.base_url,
         token=fake_ha.token,
-        ping_interval=0,  # disable keepalive for deterministic tests
+        ping_interval=0,
         request_timeout=5.0,
     )
     await ha.connect()

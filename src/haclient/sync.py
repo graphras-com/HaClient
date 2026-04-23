@@ -42,6 +42,7 @@ class _LoopThread:
         self._started.wait()
 
     def _run(self) -> None:
+        """Execute the event loop until stopped."""
         asyncio.set_event_loop(self.loop)
         self._started.set()
         try:
@@ -57,18 +58,21 @@ class _LoopThread:
                 self.loop.close()
 
     def submit(self, coro: Awaitable[T], *, timeout: float | None = None) -> T:
+        """Submit an awaitable to the background loop and block for the result."""
         if not inspect.isawaitable(coro):  # pragma: no cover - defensive
             raise TypeError("submit() expects an awaitable")
         future = asyncio.run_coroutine_threadsafe(_ensure_coro(coro), self.loop)
         return future.result(timeout=timeout)
 
     def stop(self) -> None:
+        """Stop the event loop and join the background thread."""
         if not self.loop.is_closed():
             self.loop.call_soon_threadsafe(self.loop.stop)
         self._thread.join(timeout=5.0)
 
 
 async def _ensure_coro(awaitable: Awaitable[T]) -> T:
+    """Wrap an arbitrary awaitable into a proper coroutine."""
     return await awaitable
 
 
@@ -120,7 +124,6 @@ class SyncHAClient:
         """Return the underlying :class:`HAClient` instance."""
         return self._client
 
-    # ----------------------------------------------------- connection lifecycle
     def connect(self) -> None:
         """Connect the underlying client."""
         self._loop_thread.submit(self._client.connect())
@@ -139,7 +142,6 @@ class SyncHAClient:
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
         self.close()
 
-    # ------------------------------------------------------- service helpers
     def call_service(self, domain: str, service: str, data: dict[str, Any] | None = None) -> Any:
         """Invoke a Home Assistant service synchronously."""
         return self._loop_thread.submit(self._client.call_service(domain, service, data))
@@ -148,7 +150,6 @@ class SyncHAClient:
         """Refresh all registered entities synchronously."""
         self._loop_thread.submit(self._client.refresh_all())
 
-    # ---------------------------------------------------- domain accessors
     def media_player(self, name: str) -> Any:
         """Return a sync proxy wrapping the async :class:`MediaPlayer`."""
         return _SyncProxy(self._client.media_player(name), self._loop_thread)

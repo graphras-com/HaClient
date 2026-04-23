@@ -43,8 +43,8 @@ class RestClient:
         self._session = session
         self._owns_session = session is None
 
-    # ------------------------------------------------------------- lifecycle
     async def _ensure_session(self) -> aiohttp.ClientSession:
+        """Return the current session, creating one if necessary."""
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
             self._owns_session = True
@@ -55,15 +55,16 @@ class RestClient:
         if self._owns_session and self._session is not None and not self._session.closed:
             await self._session.close()
 
-    # --------------------------------------------------------------- helpers
     @property
     def _headers(self) -> dict[str, str]:
+        """Return the authorization and content-type headers."""
         return {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
         }
 
     def _url(self, path: str) -> str:
+        """Build a full URL from a relative API path."""
         if not path.startswith("/"):
             path = "/" + path
         return f"{self._base_url}{path}"
@@ -75,6 +76,7 @@ class RestClient:
         *,
         json: Any | None = None,
     ) -> Any:
+        """Perform an HTTP request and return the parsed response."""
         session = await self._ensure_session()
         url = self._url(path)
         try:
@@ -99,7 +101,6 @@ class RestClient:
         except aiohttp.ClientError as err:
             raise HAClientError(f"HTTP request failed: {err}") from err
 
-    # ---------------------------------------------------------------- public
     async def ping(self) -> bool:
         """Return ``True`` if the Home Assistant API is reachable."""
         await self._request("GET", "/api/")
@@ -117,7 +118,6 @@ class RestClient:
         try:
             data = await self._request("GET", f"/api/states/{entity_id}")
         except HAClientError as err:
-            # HA returns 404 for unknown entities
             if "HTTP 404" in str(err):
                 return None
             raise

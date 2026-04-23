@@ -80,9 +80,7 @@ class WebSocketClient:
         self._message_id = 0
         self._pending: dict[int, asyncio.Future[Any]] = {}
         self._pong_waiters: dict[int, asyncio.Future[Any]] = {}
-        # id -> handler for subscription/event messages
         self._subscriptions: dict[int, EventHandler] = {}
-        # event_type -> (subscription_id, handler) - used for resubscribe
         self._event_subs: dict[str, tuple[int, EventHandler]] = {}
 
         self._reader_task: asyncio.Task[None] | None = None
@@ -91,13 +89,11 @@ class WebSocketClient:
         self._connected = asyncio.Event()
         self._disconnect_listeners: list[Callable[[], Awaitable[None] | None]] = []
 
-    # ---------------------------------------------------------- properties
     @property
     def connected(self) -> bool:
         """Return ``True`` while the underlying socket is open."""
         return self._ws is not None and not self._ws.closed
 
-    # ------------------------------------------------------------- lifecycle
     async def connect(self) -> None:
         """Establish the WebSocket connection and authenticate."""
         if self.connected:
@@ -111,12 +107,14 @@ class WebSocketClient:
             )
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
+        """Return the current session, creating one if necessary."""
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
             self._owns_session = True
         return self._session
 
     async def _do_connect(self) -> None:
+        """Open the WebSocket and perform the authentication handshake."""
         session = await self._ensure_session()
         try:
             self._ws = await session.ws_connect(
@@ -128,7 +126,6 @@ class WebSocketClient:
         except aiohttp.ClientError as err:
             raise HAClientError(f"Failed to connect to {self._url}: {err}") from err
 
-        # Auth handshake: auth_required -> auth -> auth_ok | auth_invalid
         msg = await self._recv_json()
         if msg.get("type") != "auth_required":
             raise AuthenticationError(f"Expected auth_required, got {msg.get('type')!r}")
@@ -160,7 +157,6 @@ class WebSocketClient:
             except (TimeoutError, asyncio.CancelledError, Exception):  # noqa: BLE001
                 self._reader_task.cancel()
             self._reader_task = None
-        # Fail any pending requests so callers don't hang forever.
         for fut in self._pending.values():
             if not fut.done():
                 fut.set_exception(ConnectionClosedError("WebSocket closed"))
@@ -179,12 +175,13 @@ class WebSocketClient:
         self._disconnect_listeners.append(handler)
         return handler
 
-    # ------------------------------------------------------- send / receive
     def _next_id(self) -> int:
+        """Return the next monotonically-increasing message id."""
         self._message_id += 1
         return self._message_id
 
     async def _recv_json(self) -> dict[str, Any]:
+        """Read a single JSON message from the WebSocket."""
         assert self._ws is not None
         msg = await self._ws.receive()
         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -235,7 +232,6 @@ class WebSocketClient:
             self._pending.pop(cmd_id, None)
         return result
 
-    # ---------------------------------------------------------- subscriptions
     async def subscribe_events(
         self,
         handler: EventHandler,
@@ -275,8 +271,8 @@ class WebSocketClient:
             if sid == subscription_id:
                 self._event_subs.pop(k, None)
 
-    # ------------------------------------------------------------- reader loop
     async def _reader_loop(self) -> None:
+        """Consume incoming WebSocket messages until the socket closes."""
         assert self._ws is not None
         try:
             while not self._closing:
@@ -306,7 +302,6 @@ class WebSocketClient:
                     break
         finally:
             self._connected.clear()
-            # Fail any pending requests so callers unblock.
             for fut in list(self._pending.values()):
                 if not fut.done():
                     fut.set_exception(ConnectionClosedError("WebSocket closed"))
@@ -320,6 +315,7 @@ class WebSocketClient:
                 asyncio.create_task(self._reconnect_loop(), name="ha-ws-reconnect")
 
     async def _notify_disconnect(self) -> None:
+        """Invoke all registered disconnect listeners."""
         for listener in list(self._disconnect_listeners):
             try:
                 result = listener()
@@ -329,6 +325,7 @@ class WebSocketClient:
                 _LOGGER.exception("Disconnect listener raised")
 
     async def _dispatch(self, msg: dict[str, Any]) -> None:
+        """Route an incoming message to the appropriate handler or future."""
         mtype = msg.get("type")
         mid = msg.get("id")
         if mtype == "result":
@@ -358,10 +355,10 @@ class WebSocketClient:
                 if pong_fut is not None and not pong_fut.done():
                     pong_fut.set_result(msg)
             return
-        # Unhandled – log at debug for visibility in tests.
         _LOGGER.debug("Unhandled WS message: %s", mtype)
 
     async def _invoke_handler(self, handler: EventHandler, event: dict[str, Any]) -> None:
+        """Call an event handler, awaiting it if it returns a coroutine."""
         try:
             result = handler(event)
             if asyncio.iscoroutine(result):
@@ -369,8 +366,8 @@ class WebSocketClient:
         except Exception:  # pragma: no cover - defensive
             _LOGGER.exception("Event handler raised")
 
-    # ---------------------------------------------------------- reconnect
     async def _reconnect_loop(self) -> None:
+        """Attempt to re-establish the connection with exponential back-off."""
         delay = 1.0
         attempt = 0
         while not self._closing:
@@ -384,13 +381,11 @@ class WebSocketClient:
                 delay = min(delay * 2, 60.0)
                 continue
 
-            # Restart background loops.
             self._reader_task = asyncio.create_task(self._reader_loop(), name="ha-ws-reader")
             if self._ping_interval > 0:
                 self._keepalive_task = asyncio.create_task(
                     self._keepalive_loop(), name="ha-ws-keepalive"
                 )
-            # Re-subscribe prior event subscriptions.
             for event_type, (_old_id, handler) in list(self._event_subs.items()):
                 try:
                     await self.subscribe_events(handler, event_type)
@@ -398,7 +393,6 @@ class WebSocketClient:
                     _LOGGER.warning("Failed to resubscribe to %s: %s", event_type, err)
             return
 
-    # ---------------------------------------------------------- keepalive
     async def ping(self, *, timeout: float | None = None) -> None:
         """Send a ``ping`` frame and wait for the matching ``pong``.
 
@@ -422,6 +416,7 @@ class WebSocketClient:
             self._pong_waiters.pop(cmd_id, None)
 
     async def _keepalive_loop(self) -> None:
+        """Periodically ping the server and force a reconnect on timeout."""
         try:
             while self.connected and not self._closing:
                 await asyncio.sleep(self._ping_interval)

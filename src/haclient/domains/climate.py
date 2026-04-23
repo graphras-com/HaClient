@@ -12,7 +12,6 @@ class Climate(Entity):
 
     domain = "climate"
 
-    # --------------------------------------------------------------- events
     def on_hvac_mode_change(self, func: Any) -> Any:
         """Register a listener for HVAC mode changes. Callback: ``(old_mode, new_mode)``."""
         return self._register_state_value_listener(func)
@@ -25,7 +24,6 @@ class Climate(Entity):
         """Register a listener for target temperature changes. Callback: ``(old, new)``."""
         return self._register_attr_listener("temperature", func)
 
-    # ------------------------------------------------------------------ state
     @property
     def current_temperature(self) -> float | None:
         """The current measured temperature, if reported."""
@@ -49,7 +47,6 @@ class Climate(Entity):
         modes = self.attributes.get("hvac_modes")
         return list(modes) if isinstance(modes, list) else []
 
-    # ------------------------------------------------------------------ actions
     async def set_temperature(
         self,
         temperature: float,

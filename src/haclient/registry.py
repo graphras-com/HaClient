@@ -23,7 +23,6 @@ class EntityRegistry:
     def __init__(self) -> None:
         self._entities: dict[str, Entity] = {}
 
-    # ------------------------------------------------------------------ core
     def register(self, entity: Entity) -> None:
         """Register ``entity`` (overwriting any existing entry)."""
         self._entities[entity.entity_id] = entity
@@ -56,7 +55,6 @@ class EntityRegistry:
         """Remove all registered entities."""
         self._entities.clear()
 
-    # -------------------------------------------------------------- lookup
     def resolve(self, domain: str, name: str) -> str:
         """Resolve a short name to a full ``entity_id`` within ``domain``.
 

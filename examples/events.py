@@ -27,7 +27,6 @@ async def main() -> None:
             state = new.get("state") if new else "unknown"
             print(f"Door is now {state}")
 
-        # Sit in an infinite loop so events keep arriving.
         print("Listening for events. Ctrl+C to quit.")
         while True:
             await asyncio.sleep(60)

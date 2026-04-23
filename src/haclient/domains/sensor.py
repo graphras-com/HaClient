@@ -12,7 +12,6 @@ class Sensor(Entity):
 
     domain = "sensor"
 
-    # --------------------------------------------------------------- events
     def on_value_change(self, func: Any) -> Any:
         """Register a listener for sensor value changes. Callback: ``(old_state, new_state)``."""
         return self._register_state_value_listener(func)

@@ -27,10 +27,7 @@ async def test_connect_primes_state(fake_ha: FakeHA) -> None:
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
     try:
         await ha.connect()
-        # Accessor triggers registration; state should populate immediately via refresh.
         light = ha.light("kitchen")
-        # After entity creation, manually refresh to pick up state since connect()
-        # only primes *already registered* entities.
         await light.async_refresh()
         assert light.is_on
         assert light.brightness == 150
@@ -59,7 +56,6 @@ async def test_state_changed_dispatches_to_entity(client: HAClient, fake_ha: Fak
         "light.kitchen",
         {"state": "on", "attributes": {"brightness": 180}},
     )
-    # Allow event dispatch.
     for _ in range(20):
         await asyncio.sleep(0.02)
         if light.is_on:
@@ -72,7 +68,6 @@ async def test_domain_accessor_reuse(client: HAClient) -> None:
     a = client.media_player("livingroom")
     b = client.media_player("livingroom")
     assert a is b
-    # Full entity_id works too.
     c = client.media_player("media_player.livingroom")
     assert c is a
 
@@ -80,7 +75,6 @@ async def test_domain_accessor_reuse(client: HAClient) -> None:
 async def test_domain_accessor_type_conflict(client: HAClient) -> None:
     client.light("kitchen")
     with pytest.raises(HAClientError):
-        # Already registered as Light; requesting Switch with same entity id fails.
         from haclient import Switch
 
         client._get_or_create("light", "kitchen", Switch)
@@ -102,7 +96,6 @@ async def test_refresh_all(client: HAClient, fake_ha: FakeHA) -> None:
 
 async def test_refresh_all_marks_missing_unavailable(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
-    # states is empty → entity should become unavailable
     await client.refresh_all()
     assert not light.available
     assert light.state == "unavailable"
@@ -117,7 +110,6 @@ async def test_context_manager(fake_ha: FakeHA) -> None:
 async def test_call_service_via_rest_fallback(fake_ha: FakeHA) -> None:
     """If WS isn't connected, fall back to REST."""
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
-    # Do NOT connect – WS is not up, so a call_service(use_websocket=False) routes via REST.
     try:
         await ha.call_service("switch", "toggle", {"entity_id": "switch.x"}, use_websocket=False)
     finally:
@@ -130,21 +122,19 @@ async def test_invalid_entity_id_direct_construction() -> None:
     from haclient import Light
 
     with pytest.raises(ValueError):
-        Light("kitchen", ha)  # missing domain
+        Light("kitchen", ha)
 
 
 async def test_double_connect_is_noop(client: HAClient) -> None:
-    await client.connect()  # already connected, should return immediately
+    await client.connect()
 
 
 def test_loop_property_without_running_loop() -> None:
     ha = HAClient("http://x", "t")
-    # Calling from a synchronous context: no running loop → None.
     assert ha.loop is None
 
 
 async def test_state_changed_event_missing_entity_id(client: HAClient) -> None:
-    # Sends a state_changed with malformed data – must be a no-op.
     client._on_state_changed_event({"data": {"entity_id": 42}})
     client._on_state_changed_event({})
 
@@ -154,7 +144,6 @@ async def test_connect_primes_already_registered_entity(fake_ha: FakeHA) -> None
         {"entity_id": "light.kitchen", "state": "on", "attributes": {"brightness": 90}},
     ]
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
-    # Pre-register the light before connect.
     from haclient import Light
 
     light = Light("light.kitchen", ha)
@@ -170,7 +159,7 @@ async def test_initial_state_fetch_includes_non_string_entity_id(
     fake_ha: FakeHA,
 ) -> None:
     fake_ha.states = [
-        {"entity_id": 123, "state": "on", "attributes": {}},  # malformed
+        {"entity_id": 123, "state": "on", "attributes": {}},
         {"entity_id": "light.kitchen", "state": "on", "attributes": {}},
     ]
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
@@ -181,12 +170,8 @@ async def test_initial_state_fetch_includes_non_string_entity_id(
 
 
 async def test_initial_state_fetch_failure_is_logged(fake_ha: FakeHA, caplog: Any) -> None:
-    # Break REST auth so initial /api/states fails; connect should still succeed.
     ha = HAClient(fake_ha.base_url, "wrong-token", ping_interval=0)
-    # But WS auth needs the real token, so use a different strategy: point REST at
-    # a closed port while leaving WS on the real server.
     ha.rest._token = "still-wrong"  # noqa: SLF001
-    # WS token is still the real one so connection proceeds.
     ha._token = fake_ha.token  # noqa: SLF001
     ha.ws._token = fake_ha.token  # noqa: SLF001
     try:

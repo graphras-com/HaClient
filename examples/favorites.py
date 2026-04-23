@@ -21,11 +21,6 @@ async def main() -> None:
         favs = await player.favorites()
         for fav in favs:
             print(fav)
-            # print(f"  {fav.media_content_type}: {fav.title}")
-
-        # if favs:
-        #    print(f"Playing: {favs[0].title}")
-        #    #await favs[0].play()
 
 
 if __name__ == "__main__":

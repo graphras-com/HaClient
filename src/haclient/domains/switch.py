@@ -12,7 +12,6 @@ class Switch(Entity):
 
     domain = "switch"
 
-    # --------------------------------------------------------------- events
     def on_turn_on(self, func: Any) -> Any:
         """Register a listener for when the switch turns on.
 

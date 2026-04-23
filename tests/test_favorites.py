@@ -34,7 +34,6 @@ def _make_tree() -> dict[str, Any]:
                 "can_expand": False,
                 "can_play": True,
             },
-            # Duplicated child – should be de-duplicated on output.
             {
                 "title": "Single Track dup",
                 "media_content_id": "track://1",
@@ -63,7 +62,6 @@ def _make_subtree() -> dict[str, Any]:
             },
             {
                 "title": "BadItem",
-                # missing media_content_id → must be skipped
                 "media_content_type": "track",
                 "can_play": True,
                 "can_expand": False,
@@ -118,14 +116,11 @@ async def test_favorites_flattens_tree(client: HAClient, fake_ha: FakeHA) -> Non
     favs = await mp.favorites()
     titles = [f.title for f in favs]
     ids = [f.media_content_id for f in favs]
-    # Expected: Single Track (dedup), Playlist A, Song 1, Song 2
     assert "Single Track" in titles
     assert "Playlist A" in titles
     assert "Song 1" in titles
     assert "Song 2" in titles
-    # No duplicates
     assert len(ids) == len(set(ids))
-    # BadItem (missing content id) must be excluded.
     assert "BadItem" not in titles
 
 
@@ -134,7 +129,6 @@ async def test_favorites_item_play(client: HAClient, fake_ha: FakeHA) -> None:
     mp = client.media_player("livingroom")
     favs = await mp.favorites()
     assert favs
-    # Pick the Playlist A favorite and play it.
     playlist = next(f for f in favs if f.title == "Playlist A")
     await playlist.play()
     call = fake_ha.ws_service_calls[-1]
@@ -165,9 +159,6 @@ async def test_favorites_max_depth(client: HAClient, fake_ha: FakeHA) -> None:
     """Guard: max_depth stops recursion."""
     fake_ha.handlers["media_player/browse_media"] = _browse_handler
     mp = client.media_player("livingroom")
-    # max_depth=1 means only the top-level children are considered – we should
-    # get the Single Track but *not* Song 1 / Song 2 (those live two levels
-    # below the root).
     favs = await mp.favorites(max_depth=1)
     titles = [f.title for f in favs]
     assert "Single Track" in titles
@@ -178,8 +169,6 @@ async def test_favorites_max_nodes(client: HAClient, fake_ha: FakeHA) -> None:
     fake_ha.handlers["media_player/browse_media"] = _browse_handler
     mp = client.media_player("livingroom")
     result = await mp.favorites(max_nodes=1)
-    # With only one node visited we cannot descend; the only candidates are
-    # those discovered at the root node itself.
     assert all(isinstance(f.title, str) for f in result)
 
 
@@ -196,7 +185,6 @@ async def test_favorites_subtree_failure_is_tolerated(client: HAClient, fake_ha:
                 }
             )
         else:
-            # Every subtree browse fails.
             await ws.send_json(
                 {
                     "id": msg["id"],
@@ -210,7 +198,7 @@ async def test_favorites_subtree_failure_is_tolerated(client: HAClient, fake_ha:
     mp = client.media_player("livingroom")
     favs = await mp.favorites()
     titles = [f.title for f in favs]
-    assert "Single Track" in titles  # still collected from the root
+    assert "Single Track" in titles
     assert "Song 1" not in titles
 
 
@@ -393,5 +381,4 @@ async def test_browse_media_malformed_response(client: HAClient, fake_ha: FakeHA
 
     fake_ha.handlers["media_player/browse_media"] = bad
     mp = client.media_player("livingroom")
-    # favorites swallows HAClientError from browse_media.
     assert await mp.favorites() == []

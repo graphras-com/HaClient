@@ -114,7 +114,6 @@ class HAClient:
         self._state_sub_id: int | None = None
         self._connected = False
 
-    # -------------------------------------------------- async context manager
     async def __aenter__(self) -> HAClient:
         await self.connect()
         return self
@@ -127,7 +126,6 @@ class HAClient:
     ) -> None:
         await self.close()
 
-    # ------------------------------------------------------- lifecycle
     @property
     def loop(self) -> asyncio.AbstractEventLoop | None:
         """Return the event loop the client is bound to (if running)."""
@@ -141,7 +139,6 @@ class HAClient:
         if self._connected:
             return
         await self.ws.connect()
-        # Seed entity states from REST so attribute access works immediately.
         try:
             states = await self.rest.get_states()
         except HAClientError as err:
@@ -154,7 +151,6 @@ class HAClient:
             entity = self.registry.get(eid)
             if entity is not None:
                 entity._apply_state(state)  # noqa: SLF001
-        # Subscribe to state_changed events so registered entities stay fresh.
         self._state_sub_id = await self.ws.subscribe_events(
             self._on_state_changed_event, "state_changed"
         )
@@ -166,8 +162,8 @@ class HAClient:
         await self.ws.close()
         await self.rest.close()
 
-    # -------------------------------------------------------- event wiring
     def _on_state_changed_event(self, event: dict[str, Any]) -> None:
+        """Dispatch a ``state_changed`` event to the appropriate entity."""
         data = event.get("data") or {}
         eid = data.get("entity_id")
         if not isinstance(eid, str):
@@ -179,7 +175,6 @@ class HAClient:
             data.get("old_state"), data.get("new_state")
         )
 
-    # ---------------------------------------------------- service helpers
     async def call_service(
         self,
         domain: str,
@@ -201,8 +196,6 @@ class HAClient:
                 "service": service,
             }
             if data:
-                # HA expects 'target'/'service_data' separation; 'service_data'
-                # works with entity_id embedded for all domains we care about.
                 payload["service_data"] = data
             return await self.ws.send_command(payload)
         return await self.rest.call_service(domain, service, data)
@@ -214,8 +207,8 @@ class HAClient:
         for entity in list(self.registry):
             entity._apply_state(index.get(entity.entity_id))  # noqa: SLF001
 
-    # --------------------------------------------------- domain accessors
     def _get_or_create(self, domain: str, name: str, cls: type[_E]) -> _E:
+        """Return the entity for *name* in *domain*, creating it if needed."""
         entity_id = self.registry.resolve(domain, name)
         existing = self.registry.get(entity_id)
         if existing is not None:

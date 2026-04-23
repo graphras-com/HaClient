@@ -13,7 +13,6 @@ def test_resolve_short_and_full_name() -> None:
     reg = EntityRegistry()
     assert reg.resolve("light", "kitchen") == "light.kitchen"
     assert reg.resolve("light", "light.kitchen") == "light.kitchen"
-    # Cross-domain full id is returned verbatim (caller bears responsibility).
     assert reg.resolve("light", "switch.hall") == "switch.hall"
 
 
@@ -26,7 +25,7 @@ def test_require_missing() -> None:
 def test_register_and_lookup() -> None:
     reg = EntityRegistry()
     client = HAClient("http://x", "t")
-    client.registry = reg  # swap the registry so Light registers here
+    client.registry = reg
 
     from haclient import Light
 

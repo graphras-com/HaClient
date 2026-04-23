@@ -68,7 +68,6 @@ async def test_remove_listener(client: HAClient, fake_ha: FakeHA) -> None:
 
     light.on_state_change(handler)
     light.remove_listener(handler)
-    # removing twice is a no-op
     light.remove_listener(handler)
     await fake_ha.push_state_changed("light.kitchen", {"state": "on", "attributes": {}})
     await asyncio.sleep(0.05)
@@ -86,6 +85,5 @@ async def test_unavailable_state(client: HAClient, fake_ha: FakeHA) -> None:
 async def test_state_change_for_unknown_entity_is_ignored(
     client: HAClient, fake_ha: FakeHA
 ) -> None:
-    # Nothing registered for switch.mystery; event dispatch must not explode.
     await fake_ha.push_state_changed("switch.mystery", {"state": "on", "attributes": {}})
     await asyncio.sleep(0.05)

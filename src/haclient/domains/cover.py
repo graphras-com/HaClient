@@ -12,7 +12,6 @@ class Cover(Entity):
 
     domain = "cover"
 
-    # --------------------------------------------------------------- events
     def on_open(self, func: Any) -> Any:
         """Register a listener for when the cover opens. Callback: ``(old_state, new_state)``."""
         return self._register_state_transition_listener("open", func)
