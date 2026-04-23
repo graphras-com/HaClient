@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any  # noqa: F401 – used in type hints below
+from typing import Any
 
 from ..entity import Entity
 

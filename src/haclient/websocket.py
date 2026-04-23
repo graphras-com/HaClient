@@ -84,7 +84,6 @@ class WebSocketClient:
         self._subscriptions: dict[int, EventHandler] = {}
         # event_type -> (subscription_id, handler) - used for resubscribe
         self._event_subs: dict[str, tuple[int, EventHandler]] = {}
-        self._trigger_subs: dict[int, dict[str, Any]] = {}
 
         self._reader_task: asyncio.Task[None] | None = None
         self._keepalive_task: asyncio.Task[None] | None = None
