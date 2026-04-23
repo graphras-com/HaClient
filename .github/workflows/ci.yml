@@ -59,6 +59,15 @@ jobs:
       python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
       install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[dev]' }}
 
+  py-typecheck:
+    name: Python Type Check
+    if: needs.detect-stack.outputs.has-python == 'true'
+    needs: [detect-stack]
+    uses: ./.github/workflows/python-typecheck.yml
+    with:
+      python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
+      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[dev]' }}
+
   py-test:
     name: Python Test
     if: needs.detect-stack.outputs.has-python == 'true'
@@ -82,17 +91,18 @@ jobs:
   quality-gate:
     name: Quality gate
     if: always()
-    needs: [detect-stack, py-lint, py-build, py-test, secrets-scan]
+    needs: [detect-stack, py-lint, py-build, py-typecheck, py-test, secrets-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Check required job results
         env:
           PY_LINT: ${{ needs.py-lint.result }}
           PY_BUILD: ${{ needs.py-build.result }}
+          PY_TYPECHECK: ${{ needs.py-typecheck.result }}
           PY_TEST: ${{ needs.py-test.result }}
           SECRETS_SCAN: ${{ needs.secrets-scan.result }}
         run: |
-          results=("$PY_LINT" "$PY_BUILD" "$PY_TEST" "$SECRETS_SCAN")
+          results=("$PY_LINT" "$PY_BUILD" "$PY_TYPECHECK" "$PY_TEST" "$SECRETS_SCAN")
           for result in "${results[@]}"; do
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               exit 1
