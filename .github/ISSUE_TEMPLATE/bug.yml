@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a reproducible defect in HaClient.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for confirmed defects. Reproduce the issue on current `main` first if you can.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: State the failure in one or two sentences.
+      placeholder: `MediaPlayer.favorites()` stops returning items after the first reconnect.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: HaClient Version
+      description: Package version, commit SHA, or branch name.
+      placeholder: 0.3.2 / 6b682d0 / docs/add-github-templates
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: 3.11.11
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      placeholder: 2026.4.2
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps To Reproduce
+      description: Provide exact steps or a minimal script.
+      placeholder: |
+        1. Start the fake or real Home Assistant instance
+        2. Connect with `HAClient`
+        3. Call the affected API
+        4. Observe the failure
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: The client should resubscribe and continue returning favorites.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: The call returns an empty list after reconnect.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs Or Traceback
+      description: Paste the relevant output. Trim noise.
+      render: text
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Network conditions, auth mode, integrations involved, or anything else useful.
