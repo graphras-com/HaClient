@@ -53,7 +53,13 @@ class Cover(Entity):
         await self.call_service("stop_cover")
 
     async def set_position(self, position: int) -> None:
-        """Set the cover position (0 closed, 100 open)."""
+        """Set the cover position.
+
+        Parameters
+        ----------
+        position : int
+            Target position (0 = closed, 100 = open).
+        """
         await self.call_service("set_cover_position", {"position": int(position)})
 
     async def toggle(self) -> None:

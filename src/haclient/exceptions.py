@@ -1,6 +1,6 @@
 """Exception hierarchy for the Home Assistant client.
 
-All library-specific exceptions derive from :class:`HAClientError` so callers
+All library-specific exceptions derive from `HAClientError` so callers
 can catch a single base type if they do not care about the specific failure.
 """
 
@@ -20,7 +20,15 @@ class ConnectionClosedError(HAClientError):
 
 
 class CommandError(HAClientError):
-    """Raised when Home Assistant returns an error for a WebSocket command."""
+    """Raised when Home Assistant returns an error for a WebSocket command.
+
+    Attributes
+    ----------
+    code : str
+        The error code from Home Assistant.
+    message : str
+        The human-readable error message.
+    """
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")

@@ -1,17 +1,19 @@
 """High-level Home Assistant client.
 
 This module ties together the REST and WebSocket layers, the entity registry
-and the domain helper classes into a single coherent API:
-
-.. code-block:: python
-
-    async with HAClient("http://localhost:8123", token="...") as ha:
-        light = ha.light("kitchen")
-        await light.turn_on(brightness=200)
+and the domain helper classes into a single coherent API.
 
 The client exposes one accessor per supported domain (``media_player``,
 ``light``, ``switch``, ...). The accessor performs name resolution, creates a
 domain object lazily if needed and returns the registered instance.
+
+Examples
+--------
+::
+
+    async with HAClient("http://localhost:8123", token="...") as ha:
+        light = ha.light("kitchen")
+        await light.turn_on(brightness=200)
 """
 
 from __future__ import annotations
@@ -58,22 +60,21 @@ class HAClient:
 
     Parameters
     ----------
-    base_url:
+    base_url : str
         The Home Assistant base URL (e.g. ``http://homeassistant.local:8123``).
-    token:
+    token : str
         Long-lived access token.
-    ws_url:
-        Optional explicit WebSocket URL. If omitted it is derived from
-        ``base_url``.
-    session:
-        Optional shared :class:`aiohttp.ClientSession`.
-    reconnect:
+    ws_url : str or None, optional
+        Explicit WebSocket URL. If omitted it is derived from *base_url*.
+    session : aiohttp.ClientSession or None, optional
+        Shared ``aiohttp.ClientSession``.
+    reconnect : bool, optional
         Whether to reconnect the WebSocket automatically.
-    ping_interval:
+    ping_interval : float, optional
         Seconds between keepalive pings (set to ``0`` to disable).
-    request_timeout:
+    request_timeout : float, optional
         Default timeout for WebSocket/REST operations.
-    verify_ssl:
+    verify_ssl : bool, optional
         Verify TLS certificates (``True`` by default).
     """
 
@@ -163,7 +164,13 @@ class HAClient:
         await self.rest.close()
 
     def _on_state_changed_event(self, event: dict[str, Any]) -> None:
-        """Dispatch a ``state_changed`` event to the appropriate entity."""
+        """Dispatch a ``state_changed`` event to the appropriate entity.
+
+        Parameters
+        ----------
+        event : dict
+            The raw event payload from the WebSocket.
+        """
         data = event.get("data") or {}
         eid = data.get("entity_id")
         if not isinstance(eid, str):
@@ -186,8 +193,24 @@ class HAClient:
         """Invoke a Home Assistant service.
 
         By default the call is made via the WebSocket API (which gives richer
-        error information). Set ``use_websocket=False`` to use the REST API
-        instead – useful before the WS connection is established.
+        error information). Set *use_websocket* to ``False`` to use the REST API
+        instead -- useful before the WS connection is established.
+
+        Parameters
+        ----------
+        domain : str
+            The service domain (e.g. ``"light"``).
+        service : str
+            The service name (e.g. ``"turn_on"``).
+        data : dict or None, optional
+            Service data payload.
+        use_websocket : bool, optional
+            If ``True`` (default), use the WebSocket API when connected.
+
+        Returns
+        -------
+        Any
+            The result payload from Home Assistant.
         """
         if use_websocket and self.ws.connected:
             payload: dict[str, Any] = {
@@ -208,7 +231,27 @@ class HAClient:
             entity._apply_state(index.get(entity.entity_id))  # noqa: SLF001
 
     def _get_or_create(self, domain: str, name: str, cls: type[_E]) -> _E:
-        """Return the entity for *name* in *domain*, creating it if needed."""
+        """Return the entity for *name* in *domain*, creating it if needed.
+
+        Parameters
+        ----------
+        domain : str
+            The Home Assistant domain (e.g. ``"light"``).
+        name : str
+            Short object-id or fully-qualified entity id.
+        cls : type
+            The ``Entity`` subclass to instantiate if absent.
+
+        Returns
+        -------
+        Entity
+            The existing or newly created entity instance.
+
+        Raises
+        ------
+        HAClientError
+            If the entity exists but is registered under a different class.
+        """
         entity_id = self.registry.resolve(domain, name)
         existing = self.registry.get(entity_id)
         if existing is not None:
@@ -221,43 +264,120 @@ class HAClient:
         return cls(entity_id, self)
 
     def media_player(self, name: str) -> MediaPlayer:
-        """Return the :class:`MediaPlayer` for ``name`` (creating it if needed)."""
+        """Return the `MediaPlayer` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        MediaPlayer
+            The media player entity.
+        """
         from .domains.media_player import MediaPlayer as _MediaPlayer
 
         return self._get_or_create("media_player", name, _MediaPlayer)
 
     def light(self, name: str) -> Light:
-        """Return the :class:`Light` for ``name``."""
+        """Return the `Light` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Light
+            The light entity.
+        """
         from .domains.light import Light as _Light
 
         return self._get_or_create("light", name, _Light)
 
     def switch(self, name: str) -> Switch:
-        """Return the :class:`Switch` for ``name``."""
+        """Return the `Switch` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Switch
+            The switch entity.
+        """
         from .domains.switch import Switch as _Switch
 
         return self._get_or_create("switch", name, _Switch)
 
     def climate(self, name: str) -> Climate:
-        """Return the :class:`Climate` for ``name``."""
+        """Return the `Climate` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Climate
+            The climate entity.
+        """
         from .domains.climate import Climate as _Climate
 
         return self._get_or_create("climate", name, _Climate)
 
     def cover(self, name: str) -> Cover:
-        """Return the :class:`Cover` for ``name``."""
+        """Return the `Cover` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Cover
+            The cover entity.
+        """
         from .domains.cover import Cover as _Cover
 
         return self._get_or_create("cover", name, _Cover)
 
     def sensor(self, name: str) -> Sensor:
-        """Return the :class:`Sensor` for ``name`` (read-only)."""
+        """Return the `Sensor` for *name* (read-only), creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Sensor
+            The sensor entity.
+        """
         from .domains.sensor import Sensor as _Sensor
 
         return self._get_or_create("sensor", name, _Sensor)
 
     def binary_sensor(self, name: str) -> BinarySensor:
-        """Return the :class:`BinarySensor` for ``name`` (read-only)."""
+        """Return the `BinarySensor` for *name* (read-only), creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        BinarySensor
+            The binary sensor entity.
+        """
         from .domains.binary_sensor import BinarySensor as _BinarySensor
 
         return self._get_or_create("binary_sensor", name, _BinarySensor)
