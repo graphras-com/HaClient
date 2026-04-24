@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOCS_DIR="$REPO_ROOT/docs"
+DOCS_DIR="$REPO_ROOT/docs/reference"
 SRC_DIR="$REPO_ROOT/src"
 
 mkdir -p "$DOCS_DIR"
@@ -21,7 +21,7 @@ MODULES=(
 )
 
 for mod in "${MODULES[@]}"; do
-    echo "  -> docs/$mod.md"
+    echo "  -> docs/reference/$mod.md"
     pydoc-markdown -I "$SRC_DIR" -m "haclient.$mod" > "$DOCS_DIR/$mod.md"
 done
 
@@ -30,8 +30,8 @@ DOMAIN_DIR="$SRC_DIR/haclient/domains"
 for f in "$DOMAIN_DIR"/*.py; do
     name="$(basename "$f" .py)"
     [[ "$name" == "__init__" ]] && continue
-    echo "  -> docs/domains_$name.md"
+    echo "  -> docs/reference/domains_$name.md"
     pydoc-markdown -I "$SRC_DIR" -m "haclient.domains.$name" > "$DOCS_DIR/domains_$name.md"
 done
 
-echo "Done. Documentation written to docs/"
+echo "Done. Documentation written to docs/reference/"
