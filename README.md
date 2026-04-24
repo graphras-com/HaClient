@@ -1,10 +1,6 @@
 # HaClient
 
 [![CI](https://github.com/graphras-com/HaClient/actions/workflows/ci.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/ci.yml)
-[![Tests](https://github.com/graphras-com/HaClient/actions/workflows/python-tests.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/python-tests.yml)
-[![Lint](https://github.com/graphras-com/HaClient/actions/workflows/python-lint.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/python-lint.yml)
-[![Type Check](https://github.com/graphras-com/HaClient/actions/workflows/python-typecheck.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/python-typecheck.yml)
-[![Gitleaks](https://github.com/graphras-com/HaClient/actions/workflows/python-gitleaks.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/python-gitleaks.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c.svg)](https://github.com/graphras-com/HaClient/network/updates)
 
