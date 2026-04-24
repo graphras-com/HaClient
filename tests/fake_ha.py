@@ -1,11 +1,11 @@
 """A minimal in-process fake of the Home Assistant HTTP + WebSocket API.
 
-The fake is implemented with :mod:`aiohttp` so the production client exercises
+The fake is implemented with ``aiohttp`` so the production client exercises
 its real code paths (TCP sockets, JSON framing, auth handshake, etc.) against
 a deterministic server, without requiring a running Home Assistant instance.
 
-Only the surface area actually used by :mod:`haclient` is implemented. The
-fake is intentionally explicit – test cases can set ``server.handler`` to
+Only the surface area actually used by ``haclient`` is implemented. The
+fake is intentionally explicit -- test cases can set ``server.handler`` to
 override command behaviour or push arbitrary events.
 """
 
@@ -201,10 +201,17 @@ class FakeHA:
         )
 
     async def push_event(self, event_type: str, event: dict[str, Any]) -> None:
-        """Push an ``event`` to every WS currently subscribed to ``event_type``.
+        """Push an event to every WS currently subscribed to *event_type*.
 
         Each event is wrapped in the standard ``{"type": "event", "event": ...}``
-        envelope expected by :class:`haclient.websocket.WebSocketClient`.
+        envelope expected by `WebSocketClient`.
+
+        Parameters
+        ----------
+        event_type : str
+            The event type string (e.g. ``"state_changed"``).
+        event : dict
+            The event payload.
         """
         for ws in self.connections:
             if ws.closed:
@@ -225,7 +232,17 @@ class FakeHA:
         new_state: dict[str, Any] | None,
         old_state: dict[str, Any] | None = None,
     ) -> None:
-        """Convenience helper for pushing a ``state_changed`` event."""
+        """Push a ``state_changed`` event.
+
+        Parameters
+        ----------
+        entity_id : str
+            The entity whose state changed.
+        new_state : dict or None
+            The new state object.
+        old_state : dict or None, optional
+            The previous state object.
+        """
         await self.push_event(
             "state_changed",
             {

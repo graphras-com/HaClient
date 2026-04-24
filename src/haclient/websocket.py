@@ -41,19 +41,21 @@ class WebSocketClient:
 
     Parameters
     ----------
-    url:
+    url : str
         Fully-qualified WebSocket URL (e.g. ``ws://localhost:8123/api/websocket``).
-    token:
+    token : str
         Long-lived access token.
-    session:
-        Optional pre-existing :class:`aiohttp.ClientSession`. If not provided
-        one will be created and closed automatically.
-    reconnect:
+    session : aiohttp.ClientSession or None, optional
+        Pre-existing ``aiohttp.ClientSession``. If not provided one will be
+        created and closed automatically.
+    reconnect : bool, optional
         Whether to reconnect automatically when the socket drops.
-    ping_interval:
+    ping_interval : float, optional
         Seconds between keepalive pings. Set to ``0`` to disable.
-    request_timeout:
+    request_timeout : float, optional
         Default timeout (seconds) for individual WebSocket commands.
+    verify_ssl : bool, optional
+        Verify TLS certificates.
     """
 
     def __init__(
@@ -171,7 +173,18 @@ class WebSocketClient:
     def on_disconnect(
         self, handler: Callable[[], Awaitable[None] | None]
     ) -> Callable[[], Awaitable[None] | None]:
-        """Register ``handler`` to be called when the connection drops."""
+        """Register *handler* to be called when the connection drops.
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
         self._disconnect_listeners.append(handler)
         return handler
 
@@ -207,10 +220,26 @@ class WebSocketClient:
     ) -> Any:
         """Send a command and await its ``result`` frame.
 
-        Returns the ``result`` payload (the value of the ``result`` key in the
-        response). Raises :class:`CommandError` if Home Assistant returns a
-        ``success: false`` response, and :class:`HATimeoutError` if no reply
-        arrives within ``timeout`` seconds.
+        Parameters
+        ----------
+        payload : dict
+            The command payload (without ``id``; one is assigned automatically).
+        timeout : float or None, optional
+            Seconds to wait for the reply. Falls back to *request_timeout*.
+
+        Returns
+        -------
+        Any
+            The value of the ``result`` key in the response.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant returns ``success: false``.
+        TimeoutError
+            If no reply arrives within the timeout.
+        ConnectionClosedError
+            If the WebSocket is not connected.
         """
         if not self.connected:
             raise ConnectionClosedError("WebSocket is not connected")
@@ -239,7 +268,17 @@ class WebSocketClient:
     ) -> int:
         """Subscribe to Home Assistant events.
 
-        Returns the subscription id (needed for :meth:`unsubscribe`).
+        Parameters
+        ----------
+        handler : callable
+            Callback invoked with the event dict. May be sync or async.
+        event_type : str or None, optional
+            Event type to filter on. If ``None``, all events are received.
+
+        Returns
+        -------
+        int
+            The subscription id (needed for `unsubscribe`).
         """
         payload: dict[str, Any] = {"type": "subscribe_events"}
         if event_type is not None:
@@ -264,7 +303,13 @@ class WebSocketClient:
         return cmd_id
 
     async def unsubscribe(self, subscription_id: int) -> None:
-        """Unsubscribe a previously registered subscription."""
+        """Unsubscribe a previously registered subscription.
+
+        Parameters
+        ----------
+        subscription_id : int
+            The id returned by `subscribe_events`.
+        """
         await self.send_command({"type": "unsubscribe_events", "subscription": subscription_id})
         self._subscriptions.pop(subscription_id, None)
         for k, (sid, _handler) in list(self._event_subs.items()):
@@ -398,6 +443,18 @@ class WebSocketClient:
 
         Home Assistant replies with ``{"type": "pong"}`` rather than a
         ``result`` frame, so this is implemented as a separate code path.
+
+        Parameters
+        ----------
+        timeout : float or None, optional
+            Seconds to wait for the pong. Falls back to *request_timeout*.
+
+        Raises
+        ------
+        TimeoutError
+            If the pong does not arrive within the timeout.
+        ConnectionClosedError
+            If the WebSocket is not connected.
         """
         if not self.connected:
             raise ConnectionClosedError("WebSocket is not connected")

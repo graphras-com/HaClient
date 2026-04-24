@@ -38,7 +38,7 @@ class Climate(Entity):
 
     @property
     def hvac_mode(self) -> str:
-        """The active HVAC mode (same as :attr:`state`)."""
+        """The active HVAC mode (same as `state`)."""
         return self.state
 
     @property
@@ -54,7 +54,17 @@ class Climate(Entity):
         hvac_mode: str | None = None,
         **extra: Any,
     ) -> None:
-        """Set the target temperature (optionally changing HVAC mode)."""
+        """Set the target temperature.
+
+        Parameters
+        ----------
+        temperature : float
+            Desired target temperature.
+        hvac_mode : str or None, optional
+            Optionally change the HVAC mode at the same time.
+        **extra : Any
+            Additional service data forwarded to Home Assistant.
+        """
         data: dict[str, Any] = {"temperature": float(temperature), **extra}
         if hvac_mode is not None:
             data["hvac_mode"] = hvac_mode

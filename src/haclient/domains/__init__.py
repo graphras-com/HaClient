@@ -1,4 +1,4 @@
-"""Domain-specific :class:`~haclient.entity.Entity` subclasses."""
+"""Domain-specific `Entity` subclasses."""
 
 from .binary_sensor import BinarySensor
 from .climate import Climate

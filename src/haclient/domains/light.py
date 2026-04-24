@@ -82,7 +82,23 @@ class Light(Entity):
         transition: float | None = None,
         **extra: Any,
     ) -> None:
-        """Turn the light on, optionally setting brightness/color/transition."""
+        """Turn the light on, optionally setting brightness/color/transition.
+
+        Parameters
+        ----------
+        brightness : int or None, optional
+            Brightness value (0--255).
+        rgb_color : tuple of int or list of int or None, optional
+            RGB color as a 3-element sequence.
+        color_temp : int or None, optional
+            Color temperature in mireds.
+        kelvin : int or None, optional
+            Color temperature in Kelvin.
+        transition : float or None, optional
+            Transition time in seconds.
+        **extra : Any
+            Additional service data forwarded to Home Assistant.
+        """
         data: dict[str, Any] = dict(extra)
         if brightness is not None:
             data["brightness"] = int(brightness)
@@ -97,7 +113,13 @@ class Light(Entity):
         await self.call_service("turn_on", data or None)
 
     async def turn_off(self, *, transition: float | None = None) -> None:
-        """Turn the light off."""
+        """Turn the light off.
+
+        Parameters
+        ----------
+        transition : float or None, optional
+            Transition time in seconds.
+        """
         data: dict[str, Any] = {}
         if transition is not None:
             data["transition"] = transition

@@ -14,7 +14,7 @@ from .fake_ha import FakeHA
 
 @pytest_asyncio.fixture
 async def fake_ha() -> AsyncIterator[FakeHA]:
-    """Start a :class:`FakeHA` server and tear it down after the test."""
+    """Start a `FakeHA` server and tear it down after the test."""
     server = FakeHA()
     await server.start()
     try:
@@ -25,7 +25,7 @@ async def fake_ha() -> AsyncIterator[FakeHA]:
 
 @pytest_asyncio.fixture
 async def client(fake_ha: FakeHA) -> AsyncIterator[HAClient]:
-    """Return a connected :class:`HAClient` talking to the fake server."""
+    """Return a connected `HAClient` talking to the fake server."""
     ha = HAClient(
         fake_ha.base_url,
         token=fake_ha.token,

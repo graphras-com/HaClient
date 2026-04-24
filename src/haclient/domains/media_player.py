@@ -1,7 +1,7 @@
 """``media_player`` domain implementation.
 
-This module also contains the :class:`FavoriteItem` helper returned by
-:meth:`MediaPlayer.favorites`, which recursively traverses the
+This module also contains the `FavoriteItem` helper returned by
+`MediaPlayer.favorites`, which recursively traverses the
 ``media_player/browse_media`` tree and flattens it into a list of directly
 playable items.
 """
@@ -23,7 +23,7 @@ _MAX_BROWSE_DEPTH = 6
 
 
 def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
-    """Build a :class:`NowPlaying` from a raw HA attributes dict."""
+    """Build a `NowPlaying` from a raw HA attributes dict."""
     features = attrs.get("supported_features") or 0
     return NowPlaying(
         source=attrs.get("source"),
@@ -49,12 +49,45 @@ class NowPlaying:
     """Structured snapshot of the media currently playing on a media player.
 
     Groups all identity-related media attributes into a single object.
-    Position/progress fields are intentionally excluded — they change
+    Position/progress fields are intentionally excluded -- they change
     continuously during playback and do not represent a change in *what*
     is playing.
 
     Instances are frozen (immutable and hashable) so two snapshots can be
     compared with ``==`` to detect whether the playing media changed.
+
+    Attributes
+    ----------
+    source : str or None
+        Active input source.
+    title : str or None
+        Media title.
+    artist : str or None
+        Media artist.
+    album : str or None
+        Album name.
+    channel : str or None
+        Channel name.
+    content_type : str or None
+        Media content type identifier.
+    content_id : str or None
+        Media content id.
+    duration : int or None
+        Media duration in seconds.
+    entity_picture : str or None
+        URL of the entity picture / album art.
+    queue_position : int or None
+        Current position in the play queue.
+    queue_size : int or None
+        Total items in the play queue.
+    playlist : str or None
+        Playlist name.
+    repeat : str or None
+        Repeat mode.
+    next : bool
+        Whether skip-next is supported.
+    previous : bool
+        Whether skip-previous is supported.
     """
 
     source: str | None = None
@@ -77,19 +110,36 @@ class NowPlaying:
 class FavoriteItem:
     """A flattened, directly-playable entry discovered via ``browse_media``.
 
-    The item remembers which :class:`MediaPlayer` it belongs to, along with the
+    The item remembers which `MediaPlayer` it belongs to, along with the
     ``media_content_id`` / ``media_content_type`` pair needed to play it. Call
-    :meth:`play` to start playback on the owning media player.
+    `play` to start playback on the owning media player.
 
     Extra metadata is captured to make the item easy to render in a UI:
 
-    * ``thumbnail`` – an optional image URL from Home Assistant.
-    * ``category`` – a human-readable label for the kind of favorite (e.g.
+    * ``thumbnail`` -- an optional image URL from Home Assistant.
+    * ``category`` -- a human-readable label for the kind of favorite (e.g.
       ``"Radio"``, ``"Albums"``, ``"Playlists"``). It is derived from the title
       of the parent folder it was found under when available, otherwise falls
       back to ``media_class``.
-    * ``media_class`` – the raw ``media_class`` reported by HA (e.g.
+    * ``media_class`` -- the raw ``media_class`` reported by HA (e.g.
       ``"genre"``, ``"album"``, ``"playlist"``, ``"track"``).
+
+    Parameters
+    ----------
+    title : str
+        Display title.
+    media_content_id : str
+        Content identifier for playback.
+    media_content_type : str
+        Content type for playback.
+    player : MediaPlayer
+        The owning media player.
+    thumbnail : str or None, optional
+        Image URL.
+    category : str or None, optional
+        Human-readable category label.
+    media_class : str or None, optional
+        Raw media class from Home Assistant.
     """
 
     __slots__ = (
@@ -122,7 +172,7 @@ class FavoriteItem:
         self._player = player
 
     async def play(self) -> None:
-        """Play this favorite on its :class:`MediaPlayer`."""
+        """Play this favorite on its `MediaPlayer`."""
         await self._player.play_media(self.media_content_type, self.media_content_id)
 
     def __repr__(self) -> str:
@@ -161,7 +211,17 @@ class MediaPlayer(Entity):
         queue_position, queue_size, playlist, repeat, next, previous)
         but **not** on position/progress updates.
 
-        Callback: ``(old: NowPlaying, new: NowPlaying)``.
+        The callback receives ``(old: NowPlaying, new: NowPlaying)``.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old, new)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         self._media_change_listeners.append(func)
         return func
@@ -253,13 +313,30 @@ class MediaPlayer(Entity):
         await self.call_service("media_previous_track")
 
     async def set_volume(self, level: float) -> None:
-        """Set the volume level (``0.0`` – ``1.0``)."""
+        """Set the volume level.
+
+        Parameters
+        ----------
+        level : float
+            Volume level between ``0.0`` and ``1.0``.
+
+        Raises
+        ------
+        ValueError
+            If *level* is outside the ``[0.0, 1.0]`` range.
+        """
         if not 0.0 <= level <= 1.0:
             raise ValueError("Volume level must be between 0.0 and 1.0")
         await self.call_service("volume_set", {"volume_level": float(level)})
 
     async def mute(self, muted: bool = True) -> None:
-        """Mute or unmute the media player."""
+        """Mute or unmute the media player.
+
+        Parameters
+        ----------
+        muted : bool, optional
+            ``True`` to mute, ``False`` to unmute.
+        """
         await self.call_service("volume_mute", {"is_volume_muted": bool(muted)})
 
     async def turn_on(self) -> None:
@@ -271,7 +348,13 @@ class MediaPlayer(Entity):
         await self.call_service("turn_off")
 
     async def select_source(self, source: str) -> None:
-        """Select an input source."""
+        """Select an input source.
+
+        Parameters
+        ----------
+        source : str
+            The source name to select.
+        """
         await self.call_service("select_source", {"source": source})
 
     async def play_media(
@@ -280,7 +363,17 @@ class MediaPlayer(Entity):
         media_content_id: str,
         **extra: Any,
     ) -> None:
-        """Play a specific media item (by content type / id)."""
+        """Play a specific media item.
+
+        Parameters
+        ----------
+        media_content_type : str
+            The content type (e.g. ``"music"``).
+        media_content_id : str
+            The content identifier.
+        **extra : Any
+            Additional service data forwarded to Home Assistant.
+        """
         data: dict[str, Any] = {
             "media_content_type": media_content_type,
             "media_content_id": media_content_id,
@@ -295,8 +388,22 @@ class MediaPlayer(Entity):
     ) -> dict[str, Any]:
         """Issue a single ``media_player/browse_media`` WebSocket command.
 
-        Returns the raw result dictionary from Home Assistant. Raises
-        :class:`HAClientError` if the command fails.
+        Parameters
+        ----------
+        media_content_type : str or None, optional
+            Content type to browse.
+        media_content_id : str or None, optional
+            Content id to browse into.
+
+        Returns
+        -------
+        dict
+            The raw result dictionary from Home Assistant.
+
+        Raises
+        ------
+        HAClientError
+            If the command fails or returns an unexpected response.
         """
         payload: dict[str, Any] = {
             "type": "media_player/browse_media",
@@ -319,20 +426,25 @@ class MediaPlayer(Entity):
     ) -> list[FavoriteItem]:
         """Return a flattened list of playable items in the media tree.
 
-        The method recursively walks the ``browse_media`` tree rooted at the
-        entity and collects every entry that Home Assistant marks as
-        ``can_play`` (and that has a ``media_content_id``).
+        Recursively walks the ``browse_media`` tree rooted at the entity and
+        collects every entry that Home Assistant marks as ``can_play`` (and
+        that has a ``media_content_id``).
 
         If the media player doesn't support browsing, an empty list is
         returned (no exception is raised).
 
         Parameters
         ----------
-        max_depth:
+        max_depth : int, optional
             Maximum recursion depth. Defaults to a sensible cap to avoid
             pathological trees.
-        max_nodes:
+        max_nodes : int, optional
             Hard upper bound on total nodes visited (also a safety net).
+
+        Returns
+        -------
+        list of FavoriteItem
+            The discovered playable items.
         """
         try:
             root = await self.browse_media()

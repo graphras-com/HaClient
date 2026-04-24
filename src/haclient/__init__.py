@@ -2,8 +2,8 @@
 
 The two main entry points are:
 
-* :class:`HAClient` – the async client.
-* :class:`SyncHAClient` – a blocking wrapper suitable for scripts / REPL use.
+* `HAClient` -- the async client.
+* `SyncHAClient` -- a blocking wrapper suitable for scripts / REPL use.
 
 See the README for usage examples.
 """

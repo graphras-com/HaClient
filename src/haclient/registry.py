@@ -1,9 +1,9 @@
 """Entity registry.
 
-The registry stores :class:`haclient.entity.Entity` instances keyed by their
-``entity_id`` and supports lookup by short (object) name scoped to a domain.
-It is owned by each :class:`haclient.client.HAClient` instance to avoid the
-pitfalls of global singletons in test and multi-client scenarios.
+The registry stores `Entity` instances keyed by their ``entity_id`` and
+supports lookup by short (object) name scoped to a domain. It is owned by
+each `HAClient` instance to avoid the pitfalls of global singletons in
+test and multi-client scenarios.
 """
 
 from __future__ import annotations
@@ -18,7 +18,13 @@ if TYPE_CHECKING:
 
 
 class EntityRegistry:
-    """In-memory mapping of ``entity_id`` → :class:`Entity`."""
+    """In-memory mapping of ``entity_id`` to `Entity`.
+
+    Attributes
+    ----------
+    _entities : dict
+        Internal mapping of entity id strings to entity instances.
+    """
 
     def __init__(self) -> None:
         self._entities: dict[str, Entity] = {}
@@ -36,7 +42,23 @@ class EntityRegistry:
         return self._entities.get(entity_id)
 
     def require(self, entity_id: str) -> Entity:
-        """Return the entity for ``entity_id`` or raise :class:`EntityNotFoundError`."""
+        """Return the entity for *entity_id* or raise `EntityNotFoundError`.
+
+        Parameters
+        ----------
+        entity_id : str
+            Fully-qualified entity id.
+
+        Returns
+        -------
+        Entity
+            The registered entity.
+
+        Raises
+        ------
+        EntityNotFoundError
+            If no entity is registered for *entity_id*.
+        """
         entity = self._entities.get(entity_id)
         if entity is None:
             raise EntityNotFoundError(f"Entity not found: {entity_id}")
@@ -56,25 +78,39 @@ class EntityRegistry:
         self._entities.clear()
 
     def resolve(self, domain: str, name: str) -> str:
-        """Resolve a short name to a full ``entity_id`` within ``domain``.
+        """Resolve a short name to a full ``entity_id`` within *domain*.
 
-        ``name`` may be either:
-
-        * the *object id* (``"livingroom"``), or
-        * the fully-qualified ``entity_id`` (``"media_player.livingroom"``).
+        *name* may be either the object id (``"livingroom"``) or the
+        fully-qualified ``entity_id`` (``"media_player.livingroom"``).
 
         Parameters
         ----------
-        domain:
+        domain : str
             The Home Assistant domain (e.g. ``"media_player"``).
-        name:
+        name : str
             The short name or full entity id to resolve.
+
+        Returns
+        -------
+        str
+            The fully-qualified entity id.
         """
         if "." in name:
             return name
         return f"{domain}.{name}"
 
     def in_domain(self, domain: str) -> list[Entity]:
-        """Return all registered entities belonging to ``domain``."""
+        """Return all registered entities belonging to *domain*.
+
+        Parameters
+        ----------
+        domain : str
+            The Home Assistant domain (e.g. ``"light"``).
+
+        Returns
+        -------
+        list of Entity
+            Entities whose id starts with ``{domain}.``.
+        """
         prefix = f"{domain}."
         return [e for eid, e in self._entities.items() if eid.startswith(prefix)]

@@ -1,13 +1,13 @@
-"""Synchronous convenience wrapper around :class:`HAClient`.
+"""Synchronous convenience wrapper around `HAClient`.
 
 The wrapper runs a dedicated event loop in a background thread and submits
-coroutines to it via :func:`asyncio.run_coroutine_threadsafe`. This allows
+coroutines to it via `asyncio.run_coroutine_threadsafe`. This allows
 users in plain scripts / REPL sessions to consume the library without thinking
 about ``asyncio`` or risking event-loop conflicts (e.g. inside Jupyter).
 
-Example
--------
-.. code-block:: python
+Examples
+--------
+::
 
     from haclient import SyncHAClient
 
@@ -58,7 +58,20 @@ class _LoopThread:
                 self.loop.close()
 
     def submit(self, coro: Awaitable[T], *, timeout: float | None = None) -> T:
-        """Submit an awaitable to the background loop and block for the result."""
+        """Submit an awaitable to the background loop and block for the result.
+
+        Parameters
+        ----------
+        coro : Awaitable[T]
+            The awaitable to execute.
+        timeout : float or None, optional
+            Maximum seconds to wait for the result.
+
+        Returns
+        -------
+        T
+            The result of the awaitable.
+        """
         if not inspect.isawaitable(coro):  # pragma: no cover - defensive
             raise TypeError("submit() expects an awaitable")
         future = asyncio.run_coroutine_threadsafe(_ensure_coro(coro), self.loop)
@@ -104,9 +117,9 @@ class _SyncProxy:
 
 
 class SyncHAClient:
-    """Synchronous counterpart of :class:`HAClient`.
+    """Synchronous counterpart of `HAClient`.
 
-    All public methods of :class:`HAClient` are exposed as blocking calls. All
+    All public methods of `HAClient` are exposed as blocking calls. All
     async methods of returned entities are automatically wrapped in a sync
     proxy so consumers can call ``player.play()`` without ``await``.
     """
@@ -121,7 +134,7 @@ class SyncHAClient:
 
     @property
     def client(self) -> HAClient:
-        """Return the underlying :class:`HAClient` instance."""
+        """Return the underlying `HAClient` instance."""
         return self._client
 
     def connect(self) -> None:
@@ -151,29 +164,29 @@ class SyncHAClient:
         self._loop_thread.submit(self._client.refresh_all())
 
     def media_player(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`MediaPlayer`."""
+        """Return a sync proxy wrapping the async `MediaPlayer`."""
         return _SyncProxy(self._client.media_player(name), self._loop_thread)
 
     def light(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`Light`."""
+        """Return a sync proxy wrapping the async `Light`."""
         return _SyncProxy(self._client.light(name), self._loop_thread)
 
     def switch(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`Switch`."""
+        """Return a sync proxy wrapping the async `Switch`."""
         return _SyncProxy(self._client.switch(name), self._loop_thread)
 
     def climate(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`Climate`."""
+        """Return a sync proxy wrapping the async `Climate`."""
         return _SyncProxy(self._client.climate(name), self._loop_thread)
 
     def cover(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`Cover`."""
+        """Return a sync proxy wrapping the async `Cover`."""
         return _SyncProxy(self._client.cover(name), self._loop_thread)
 
     def sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`Sensor`."""
+        """Return a sync proxy wrapping the async `Sensor`."""
         return _SyncProxy(self._client.sensor(name), self._loop_thread)
 
     def binary_sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async :class:`BinarySensor`."""
+        """Return a sync proxy wrapping the async `BinarySensor`."""
         return _SyncProxy(self._client.binary_sensor(name), self._loop_thread)

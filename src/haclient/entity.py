@@ -1,7 +1,7 @@
-"""Base :class:`Entity` implementation.
+"""Base `Entity` implementation.
 
-Entities are bound to an :class:`haclient.client.HAClient` instance and
-automatically receive state updates from WebSocket ``state_changed`` events.
+Entities are bound to an `HAClient` instance and automatically receive
+state updates from WebSocket ``state_changed`` events.
 """
 
 from __future__ import annotations
@@ -28,11 +28,27 @@ class Entity:
     """Represent a single Home Assistant entity.
 
     Subclasses map to specific domains (``media_player``, ``light``, ...) and
-    should override :attr:`domain` and add domain-specific methods.
+    should override `domain` and add domain-specific methods.
 
-    The :attr:`state` string and :attr:`attributes` dictionary reflect the most
-    recent state known to the client. They are refreshed automatically when the
+    The `state` string and `attributes` dictionary reflect the most recent
+    state known to the client. They are refreshed automatically when the
     client receives ``state_changed`` events for this entity.
+
+    Parameters
+    ----------
+    entity_id : str
+        Fully-qualified entity id (e.g. ``"light.kitchen"``).
+    client : HAClient
+        The owning client instance.
+
+    Attributes
+    ----------
+    entity_id : str
+        The fully-qualified entity id.
+    state : str
+        Current state string (e.g. ``"on"``, ``"off"``, ``"unavailable"``).
+    attributes : dict
+        Current entity attributes from Home Assistant.
     """
 
     domain: str = ""
@@ -144,6 +160,18 @@ class Entity:
 
         The callback receives ``(old_value, new_value)`` and is only called
         when the attribute value actually changes between events.
+
+        Parameters
+        ----------
+        attr_key : str
+            The attribute key to watch.
+        func : callable
+            Callback with signature ``(old_value, new_value)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         self._attr_listeners.setdefault(attr_key, []).append(func)
         return func
@@ -152,7 +180,19 @@ class Entity:
         """Register a listener for transitions *to* a specific state.
 
         The callback receives ``(old_state_str, new_state_str)`` and is only
-        called when the entity's state string transitions to ``to_state``.
+        called when the entity's state string transitions to *to_state*.
+
+        Parameters
+        ----------
+        to_state : str
+            The target state to listen for.
+        func : callable
+            Callback with signature ``(old_state_str, new_state_str)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         self._state_transition_listeners.setdefault(to_state, []).append(func)
         return func
@@ -162,6 +202,16 @@ class Entity:
 
         The callback receives ``(old_state_str, new_state_str)`` and fires
         whenever the state string changes (regardless of target value).
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state_str, new_state_str)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         self._state_value_listeners.append(func)
         return func
@@ -180,12 +230,22 @@ class Entity:
             self._state_value_listeners.remove(func)
 
     def on_state_change(self, func: F) -> F:
-        """Register ``func`` as a listener for state changes on this entity.
+        """Register *func* as a listener for state changes on this entity.
 
         May be used as a decorator. The callback receives the previous and new
         raw state objects (``dict`` or ``None``). Coroutine functions are fully
         supported and will be scheduled on the client's event loop without
         blocking the dispatcher.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         self._listeners.append(func)
         return func
@@ -214,9 +274,21 @@ class Entity:
     ) -> Any:
         """Call a Home Assistant service targeting this entity.
 
-        ``service`` is the service name within ``domain`` (defaulting to this
-        entity's domain). ``entity_id`` is injected automatically into the
-        service data.
+        The ``entity_id`` is injected automatically into the service data.
+
+        Parameters
+        ----------
+        service : str
+            Service name within the domain.
+        data : dict or None, optional
+            Additional service data.
+        domain : str or None, optional
+            Override domain (defaults to this entity's domain).
+
+        Returns
+        -------
+        Any
+            The result from Home Assistant.
         """
         payload: dict[str, Any] = {"entity_id": self.entity_id}
         if data:
