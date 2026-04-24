@@ -1,8 +1,10 @@
 # HaClient
 
 [![CI](https://github.com/graphras-com/HaClient/actions/workflows/ci.yml/badge.svg)](https://github.com/graphras-com/HaClient/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c.svg)](https://github.com/graphras-com/HaClient/network/updates)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
+[![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/HaClient/network/updates)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Async-first, high-level Python client for Home Assistant with REST and WebSocket support. Provides typed domain accessors, real-time state tracking, and a synchronous wrapper for scripts and REPL use.
 
