@@ -72,6 +72,85 @@ class Light(Entity):
             return (int(value[0]), int(value[1]), int(value[2]))
         return None
 
+    async def set_brightness(self, brightness: int, *, transition: float | None = None) -> None:
+        """Set the brightness (0--255), turning the light on if needed.
+
+        Parameters
+        ----------
+        brightness : int
+            Brightness value (0--255).
+        transition : float or None, optional
+            Transition time in seconds.
+        """
+        await self.turn_on(brightness=brightness, transition=transition)
+
+    async def set_kelvin(self, kelvin: int, *, transition: float | None = None) -> None:
+        """Set the color temperature in Kelvin, turning the light on if needed.
+
+        Parameters
+        ----------
+        kelvin : int
+            Color temperature in Kelvin.
+        transition : float or None, optional
+            Transition time in seconds.
+        """
+        await self.turn_on(kelvin=kelvin, transition=transition)
+
+    async def set_rgb(
+        self,
+        r: int,
+        g: int,
+        b: int,
+        *,
+        transition: float | None = None,
+    ) -> None:
+        """Set the RGB color, turning the light on if needed.
+
+        Parameters
+        ----------
+        r : int
+            Red component (0--255).
+        g : int
+            Green component (0--255).
+        b : int
+            Blue component (0--255).
+        transition : float or None, optional
+            Transition time in seconds.
+        """
+        await self.turn_on(rgb_color=(r, g, b), transition=transition)
+
+    async def set_color(
+        self,
+        *,
+        rgb: tuple[int, int, int] | None = None,
+        kelvin: int | None = None,
+        transition: float | None = None,
+    ) -> None:
+        """Set the light color by RGB or Kelvin, turning the light on if needed.
+
+        Exactly one of *rgb* or *kelvin* must be provided.
+
+        Parameters
+        ----------
+        rgb : tuple of int or None, optional
+            RGB color as a 3-element tuple.
+        kelvin : int or None, optional
+            Color temperature in Kelvin.
+        transition : float or None, optional
+            Transition time in seconds.
+
+        Raises
+        ------
+        ValueError
+            If neither or both of *rgb* and *kelvin* are provided.
+        """
+        if (rgb is None) == (kelvin is None):
+            raise ValueError("Exactly one of 'rgb' or 'kelvin' must be provided")
+        if rgb is not None:
+            await self.turn_on(rgb_color=rgb, transition=transition)
+        else:
+            await self.turn_on(kelvin=kelvin, transition=transition)
+
     async def turn_on(
         self,
         *,

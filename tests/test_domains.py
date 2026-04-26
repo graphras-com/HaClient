@@ -75,6 +75,61 @@ async def test_light_state_properties() -> None:
         await ha.close()
 
 
+async def test_light_set_brightness(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.set_brightness(200)
+    await light.set_brightness(100, transition=2.0)
+    calls = fake_ha.ws_service_calls
+    assert calls[0]["service"] == "turn_on"
+    assert calls[0]["service_data"]["brightness"] == 200
+    assert "transition" not in calls[0]["service_data"]
+    assert calls[1]["service_data"]["brightness"] == 100
+    assert calls[1]["service_data"]["transition"] == 2.0
+
+
+async def test_light_set_kelvin(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.set_kelvin(4000)
+    await light.set_kelvin(3000, transition=1.0)
+    calls = fake_ha.ws_service_calls
+    assert calls[0]["service_data"]["color_temp_kelvin"] == 4000
+    assert calls[1]["service_data"]["color_temp_kelvin"] == 3000
+    assert calls[1]["service_data"]["transition"] == 1.0
+
+
+async def test_light_set_rgb(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.set_rgb(255, 0, 128)
+    await light.set_rgb(0, 255, 0, transition=0.5)
+    calls = fake_ha.ws_service_calls
+    assert calls[0]["service_data"]["rgb_color"] == [255, 0, 128]
+    assert calls[1]["service_data"]["rgb_color"] == [0, 255, 0]
+    assert calls[1]["service_data"]["transition"] == 0.5
+
+
+async def test_light_set_color_rgb(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.set_color(rgb=(10, 20, 30))
+    call = fake_ha.ws_service_calls[0]
+    assert call["service_data"]["rgb_color"] == [10, 20, 30]
+
+
+async def test_light_set_color_kelvin(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.set_color(kelvin=5000, transition=1.0)
+    call = fake_ha.ws_service_calls[0]
+    assert call["service_data"]["color_temp_kelvin"] == 5000
+    assert call["service_data"]["transition"] == 1.0
+
+
+async def test_light_set_color_requires_exactly_one(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    with pytest.raises(ValueError, match="Exactly one"):
+        await light.set_color()
+    with pytest.raises(ValueError, match="Exactly one"):
+        await light.set_color(rgb=(1, 2, 3), kelvin=4000)
+
+
 async def test_switch_actions(client: HAClient, fake_ha: FakeHA) -> None:
     sw = client.switch("outlet")
     await sw.turn_on()
