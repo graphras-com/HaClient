@@ -19,6 +19,7 @@ from haclient.domains import (
     Light,
     MediaPlayer,
     NowPlaying,
+    Scene,
     Sensor,
     Switch,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "Light",
     "MediaPlayer",
     "NowPlaying",
+    "Scene",
     "Sensor",
     "Switch",
     "SyncHAClient",

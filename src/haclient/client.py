@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .domains.cover import Cover
     from .domains.light import Light
     from .domains.media_player import MediaPlayer
+    from .domains.scene import Scene
     from .domains.sensor import Sensor
     from .domains.switch import Switch
     from .domains.timer import Timer
@@ -382,6 +383,23 @@ class HAClient:
         from .domains.binary_sensor import BinarySensor as _BinarySensor
 
         return self._get_or_create("binary_sensor", name, _BinarySensor)
+
+    def scene(self, name: str) -> Scene:
+        """Return the `Scene` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Scene
+            The scene entity.
+        """
+        from .domains.scene import Scene as _Scene
+
+        return self._get_or_create("scene", name, _Scene)
 
     def timer(self, name: str) -> Timer:
         """Return the `Timer` for *name*, creating it if needed.

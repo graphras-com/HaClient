@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -318,3 +319,82 @@ async def test_timer_state_properties() -> None:
         assert t.finishes_at is None
     finally:
         await ha.close()
+
+
+async def test_scene_activate(client: HAClient, fake_ha: FakeHA) -> None:
+    sc = client.scene("romantic")
+    await sc.activate()
+    await sc.activate(transition=2.5)
+    calls = fake_ha.ws_service_calls
+    assert [c["service"] for c in calls] == ["turn_on", "turn_on"]
+    assert "service_data" not in calls[0] or "transition" not in calls[0].get("service_data", {})
+    assert calls[1]["service_data"]["transition"] == 2.5
+
+
+async def test_scene_state_properties() -> None:
+    ha = HAClient("http://x", "t")
+    try:
+        sc = ha.scene("romantic")
+        sc._apply_state(
+            {
+                "state": "2024-06-15T20:30:00+00:00",
+                "attributes": {
+                    "friendly_name": "Romantic",
+                    "icon": "mdi:candle",
+                    "entity_id": ["light.ceiling", "light.lamp"],
+                },
+            }
+        )
+        assert sc.last_activated == "2024-06-15T20:30:00+00:00"
+        assert sc.name == "Romantic"
+        assert sc.icon == "mdi:candle"
+        assert sc.entity_ids == ["light.ceiling", "light.lamp"]
+    finally:
+        await ha.close()
+
+
+async def test_scene_unavailable_state() -> None:
+    ha = HAClient("http://x", "t")
+    try:
+        sc = ha.scene("broken")
+        sc._apply_state({"state": "unavailable", "attributes": {}})
+        assert sc.last_activated is None
+        sc._apply_state({"state": "unknown", "attributes": {}})
+        assert sc.last_activated is None
+    finally:
+        await ha.close()
+
+
+async def test_scene_empty_attributes() -> None:
+    ha = HAClient("http://x", "t")
+    try:
+        sc = ha.scene("minimal")
+        sc._apply_state(
+            {
+                "state": "2024-01-01T00:00:00+00:00",
+                "attributes": {},
+            }
+        )
+        assert sc.entity_ids == []
+        assert sc.name is None
+        assert sc.icon is None
+    finally:
+        await ha.close()
+
+
+async def test_scene_on_activate_listener(client: HAClient, fake_ha: FakeHA) -> None:
+    sc = client.scene("romantic")
+    fired: list[tuple[Any, Any]] = []
+
+    @sc.on_activate
+    def _listener(old: Any, new: Any) -> None:
+        fired.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "scene.romantic",
+        old_state={"state": "2024-06-15T20:00:00+00:00", "attributes": {}},
+        new_state={"state": "2024-06-15T20:30:00+00:00", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(fired) == 1
+    assert fired[0][1] == "2024-06-15T20:30:00+00:00"
