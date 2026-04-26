@@ -4,6 +4,56 @@
 
 HaClient — async Python client for Home Assistant (REST + WebSocket). Single package at `src/haclient/`, built with Hatchling, sole runtime dep is `aiohttp`.
 
+## Core Mission
+
+Provide a consistent, intuitive, and Pythonic abstraction over the Home Assistant API.
+
+Do not mirror the API. Improve it.
+
+### Non-Negotiable Rules
+
+* Consistency over fidelity
+    Do not replicate inconsistent API patterns.
+* Explicit intent over generic services
+    Avoid exposing raw service calls like turn_on when intent-specific methods are clearer.
+* Graceful compatibility handling
+    Detect feature support and degrade safely. Never break user code due to missing capabilities.
+* Pythonic design
+    Interfaces must feel like Python objects, not HTTP wrappers.
+
+### Abstraction Rules
+
+* Map entities to structured Python objects.
+* Normalize domain inconsistencies.
+* Split overloaded API actions into clear methods.
+
+Example:
+
+* ❌ light.turn_on(brightness=50)
+* ✅ light.set_brightness(50)
+
+### Design Priorities
+
+1. Core domains must be clean and stable (Light, Lock, Media Player, Sensor, etc.)
+2. Extend coverage without introducing inconsistency
+3. Support advanced/edge domains only after core stability
+
+### Anti-Goals
+
+* Do not expose raw API complexity unless necessary
+* Do not enforce strict API parity
+* Do not design around Home Assistant internals—design around user expectations
+
+### Implementation Standard
+
+Every feature must answer:
+
+* Is this intuitive without Home Assistant knowledge?
+* Is this consistent with other domains?
+* Does this degrade safely if unsupported?
+
+If not, redesign it.
+
 ## Setup
 
 ```bash
@@ -26,7 +76,7 @@ You MUST follow this sequence for every task. Do not write any code before step 
 2. **Do the work.**
 3. **Run the full test suite** — every test must pass before you commit:
    ```
-   python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
+   python -m pytest tests/ --cov=haclient --cov-report=term-missing --cov-fail-under=95
    ```
 4. **Commit** — only after all tests pass.
 5. **Push and create a PR**:
@@ -36,6 +86,53 @@ You MUST follow this sequence for every task. Do not write any code before step 
    ```
 
 **Never commit directly to `main`.** No exceptions.
+
+## Docstring convention
+
+All AI agents modifying this repository must write NumPy-style docstrings for all relevant Python code.
+
+Use NumPy-style docstrings for:
+
+- Public modules
+- Public classes
+- Public methods
+- Public functions
+- Non-obvious private helpers
+- Complex test fixtures or utilities
+
+Docstrings must describe:
+
+- Purpose and behavior
+- Parameters
+- Return values
+- Raised exceptions, where relevant
+- Side effects, where relevant
+- Examples, when useful
+
+Use this format:
+
+```python
+def example_function(name: str, retries: int = 3) -> bool:
+    """Validate a named operation.
+
+    Parameters
+    ----------
+    name : str
+        Name of the operation to validate.
+    retries : int, default=3
+        Number of retry attempts before failing.
+
+    Returns
+    -------
+    bool
+        True if the operation is valid, otherwise False.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is empty.
+    """
+```
 
 ## Commands
 
