@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from .domains.media_player import MediaPlayer
     from .domains.sensor import Sensor
     from .domains.switch import Switch
+    from .domains.timer import Timer
 
 _E = TypeVar("_E", bound=Entity)
 
@@ -381,3 +382,20 @@ class HAClient:
         from .domains.binary_sensor import BinarySensor as _BinarySensor
 
         return self._get_or_create("binary_sensor", name, _BinarySensor)
+
+    def timer(self, name: str) -> Timer:
+        """Return the `Timer` for *name*, creating it if needed.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+
+        Returns
+        -------
+        Timer
+            The timer entity.
+        """
+        from .domains.timer import Timer as _Timer
+
+        return self._get_or_create("timer", name, _Timer)

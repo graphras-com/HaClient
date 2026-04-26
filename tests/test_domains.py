@@ -251,3 +251,70 @@ async def test_entity_refresh_missing(client: HAClient) -> None:
     light = client.light("missing")
     await light.async_refresh()
     assert light.state == "unavailable"
+
+
+async def test_timer_actions(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    await t.start()
+    await t.start(duration="00:05:00")
+    await t.pause()
+    await t.cancel()
+    await t.finish()
+    await t.change(duration="00:01:00")
+    assert [c["service"] for c in fake_ha.ws_service_calls] == [
+        "start",
+        "start",
+        "pause",
+        "cancel",
+        "finish",
+        "change",
+    ]
+    # First start has no extra service_data beyond entity_id
+    assert "duration" not in fake_ha.ws_service_calls[0].get("service_data", {})
+    # Second start carries duration
+    assert fake_ha.ws_service_calls[1]["service_data"]["duration"] == "00:05:00"
+    # Change carries duration
+    assert fake_ha.ws_service_calls[5]["service_data"]["duration"] == "00:01:00"
+
+
+async def test_timer_state_properties() -> None:
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("my_timer")
+        t._apply_state(
+            {
+                "state": "active",
+                "attributes": {
+                    "duration": "0:05:00",
+                    "remaining": "0:04:30",
+                    "finishes_at": "2024-01-01T12:05:00+00:00",
+                },
+            }
+        )
+        assert t.is_active
+        assert not t.is_paused
+        assert not t.is_idle
+        assert t.duration == "0:05:00"
+        assert t.remaining == "0:04:30"
+        assert t.finishes_at == "2024-01-01T12:05:00+00:00"
+
+        t._apply_state(
+            {
+                "state": "paused",
+                "attributes": {"duration": "0:05:00", "remaining": "0:03:00"},
+            }
+        )
+        assert not t.is_active
+        assert t.is_paused
+        assert not t.is_idle
+        assert t.remaining == "0:03:00"
+        assert t.finishes_at is None
+
+        t._apply_state({"state": "idle", "attributes": {"duration": "0:05:00"}})
+        assert not t.is_active
+        assert not t.is_paused
+        assert t.is_idle
+        assert t.remaining is None
+        assert t.finishes_at is None
+    finally:
+        await ha.close()
