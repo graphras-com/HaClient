@@ -119,9 +119,16 @@ class _SyncProxy:
 class SyncHAClient:
     """Synchronous counterpart of `HAClient`.
 
-    All public methods of `HAClient` are exposed as blocking calls. All
-    async methods of returned entities are automatically wrapped in a sync
-    proxy so consumers can call ``player.play()`` without ``await``.
+    All public domain accessors are exposed as blocking calls. All async
+    methods of returned entities are automatically wrapped in a sync proxy
+    so consumers can call ``player.play()`` without ``await``.
+
+    Parameters
+    ----------
+    *args : Any
+        Positional arguments forwarded to `HAClient`.
+    **kwargs : Any
+        Keyword arguments forwarded to `HAClient`.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -134,7 +141,13 @@ class SyncHAClient:
 
     @property
     def client(self) -> HAClient:
-        """Return the underlying `HAClient` instance."""
+        """Return the underlying `HAClient` instance.
+
+        Returns
+        -------
+        HAClient
+            The wrapped async client.
+        """
         return self._client
 
     def connect(self) -> None:
@@ -155,38 +168,98 @@ class SyncHAClient:
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
         self.close()
 
-    def call_service(self, domain: str, service: str, data: dict[str, Any] | None = None) -> Any:
-        """Invoke a Home Assistant service synchronously."""
-        return self._loop_thread.submit(self._client.call_service(domain, service, data))
-
     def refresh_all(self) -> None:
         """Refresh all registered entities synchronously."""
         self._loop_thread.submit(self._client.refresh_all())
 
+    # -- Domain accessors --
+
     def media_player(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `MediaPlayer`."""
+        """Return a sync proxy wrapping the async `MediaPlayer`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.media_player(name), self._loop_thread)
 
     def light(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Light`."""
+        """Return a sync proxy wrapping the async `Light`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.light(name), self._loop_thread)
 
     def switch(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Switch`."""
+        """Return a sync proxy wrapping the async `Switch`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.switch(name), self._loop_thread)
 
     def climate(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Climate`."""
+        """Return a sync proxy wrapping the async `Climate`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.climate(name), self._loop_thread)
 
     def cover(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Cover`."""
+        """Return a sync proxy wrapping the async `Cover`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.cover(name), self._loop_thread)
 
     def sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Sensor`."""
+        """Return a sync proxy wrapping the async `Sensor`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.sensor(name), self._loop_thread)
 
     def binary_sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `BinarySensor`."""
+        """Return a sync proxy wrapping the async `BinarySensor`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
         return _SyncProxy(self._client.binary_sensor(name), self._loop_thread)
+
+    def scene(self, name: str) -> Any:
+        """Return a sync proxy wrapping the async `Scene`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
+        return _SyncProxy(self._client.scene(name), self._loop_thread)
+
+    def timer(self, name: str) -> Any:
+        """Return a sync proxy wrapping the async `Timer`.
+
+        Parameters
+        ----------
+        name : str
+            Short object-id or fully-qualified entity id.
+        """
+        return _SyncProxy(self._client.timer(name), self._loop_thread)

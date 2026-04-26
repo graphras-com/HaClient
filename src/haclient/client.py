@@ -13,7 +13,7 @@ Examples
 
     async with HAClient("http://localhost:8123", token="...") as ha:
         light = ha.light("kitchen")
-        await light.turn_on(brightness=200)
+        await light.set_brightness(200)
 """
 
 from __future__ import annotations
@@ -184,7 +184,7 @@ class HAClient:
             data.get("old_state"), data.get("new_state")
         )
 
-    async def call_service(
+    async def _call_service(
         self,
         domain: str,
         service: str,

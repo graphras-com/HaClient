@@ -42,7 +42,3 @@ class TimeoutError(HAClientError):  # noqa: A001
 
 class EntityNotFoundError(HAClientError):
     """Raised when a requested entity cannot be resolved."""
-
-
-class UnsupportedOperationError(HAClientError):
-    """Raised when an operation is not supported by an entity."""

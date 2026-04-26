@@ -37,7 +37,7 @@ async def test_connect_primes_state(fake_ha: FakeHA) -> None:
 
 async def test_call_service_via_websocket(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
-    await light.turn_on(brightness=200, rgb_color=(10, 20, 30), transition=2.0)
+    await light.set_brightness(200)
 
     assert len(fake_ha.ws_service_calls) == 1
     call = fake_ha.ws_service_calls[0]
@@ -46,8 +46,6 @@ async def test_call_service_via_websocket(client: HAClient, fake_ha: FakeHA) -> 
     assert call["service"] == "turn_on"
     assert call["service_data"]["entity_id"] == "light.kitchen"
     assert call["service_data"]["brightness"] == 200
-    assert call["service_data"]["rgb_color"] == [10, 20, 30]
-    assert call["service_data"]["transition"] == 2.0
 
 
 async def test_state_changed_dispatches_to_entity(client: HAClient, fake_ha: FakeHA) -> None:
@@ -111,7 +109,7 @@ async def test_call_service_via_rest_fallback(fake_ha: FakeHA) -> None:
     """If WS isn't connected, fall back to REST."""
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
     try:
-        await ha.call_service("switch", "toggle", {"entity_id": "switch.x"}, use_websocket=False)
+        await ha._call_service("switch", "toggle", {"entity_id": "switch.x"}, use_websocket=False)
     finally:
         await ha.close()
     assert fake_ha.rest_service_calls == [("switch", "toggle", {"entity_id": "switch.x"})]

@@ -21,12 +21,14 @@ def _find_call(fake_ha: FakeHA, service: str) -> dict[str, Any]:
 
 async def test_light_actions(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
-    await light.turn_on()
-    await light.turn_on(brightness=120, rgb_color=(1, 2, 3), color_temp=200, transition=1.5)
-    await light.turn_off(transition=0.5)
+    await light.on()
+    await light.set_brightness(120)
+    await light.set_rgb(1, 2, 3)
+    await light.off(transition=0.5)
     await light.toggle()
-    await light.turn_on(kelvin=4000)
+    await light.set_kelvin(4000)
     assert [c["service"] for c in fake_ha.ws_service_calls] == [
+        "turn_on",
         "turn_on",
         "turn_on",
         "turn_off",
@@ -35,10 +37,9 @@ async def test_light_actions(client: HAClient, fake_ha: FakeHA) -> None:
     ]
     second = fake_ha.ws_service_calls[1]["service_data"]
     assert second["brightness"] == 120
-    assert second["rgb_color"] == [1, 2, 3]
-    assert second["color_temp"] == 200
-    assert second["transition"] == 1.5
-    kelvin_call = fake_ha.ws_service_calls[4]["service_data"]
+    third = fake_ha.ws_service_calls[2]["service_data"]
+    assert third["rgb_color"] == [1, 2, 3]
+    kelvin_call = fake_ha.ws_service_calls[5]["service_data"]
     assert kelvin_call["color_temp_kelvin"] == 4000
 
 
@@ -122,6 +123,20 @@ async def test_light_set_color_kelvin(client: HAClient, fake_ha: FakeHA) -> None
     assert call["service_data"]["transition"] == 1.0
 
 
+async def test_light_on_off(client: HAClient, fake_ha: FakeHA) -> None:
+    light = client.light("kitchen")
+    await light.on()
+    await light.on(transition=1.0)
+    await light.off()
+    await light.off(transition=0.5)
+    calls = fake_ha.ws_service_calls
+    assert calls[0]["service"] == "turn_on"
+    assert "transition" not in calls[0].get("service_data", {})
+    assert calls[1]["service_data"]["transition"] == 1.0
+    assert calls[2]["service"] == "turn_off"
+    assert calls[3]["service_data"]["transition"] == 0.5
+
+
 async def test_light_set_color_requires_exactly_one(client: HAClient, fake_ha: FakeHA) -> None:
     light = client.light("kitchen")
     with pytest.raises(ValueError, match="Exactly one"):
@@ -132,8 +147,8 @@ async def test_light_set_color_requires_exactly_one(client: HAClient, fake_ha: F
 
 async def test_switch_actions(client: HAClient, fake_ha: FakeHA) -> None:
     sw = client.switch("outlet")
-    await sw.turn_on()
-    await sw.turn_off()
+    await sw.on()
+    await sw.off()
     await sw.toggle()
     assert [c["service"] for c in fake_ha.ws_service_calls] == [
         "turn_on",
@@ -149,14 +164,14 @@ async def test_climate_actions(client: HAClient, fake_ha: FakeHA) -> None:
     await c.set_temperature(21.5, hvac_mode="heat")
     await c.set_hvac_mode("cool")
     await c.set_fan_mode("auto")
-    await c.turn_off()
-    await c.turn_on()
+    await c.set_hvac_mode("off")
     calls = fake_ha.ws_service_calls
     assert calls[0]["service"] == "set_temperature"
     assert calls[0]["service_data"]["temperature"] == 21.5
     assert calls[0]["service_data"]["hvac_mode"] == "heat"
     assert calls[1]["service_data"]["hvac_mode"] == "cool"
     assert calls[2]["service_data"]["fan_mode"] == "auto"
+    assert calls[3]["service_data"]["hvac_mode"] == "off"
 
     c._apply_state(
         {
@@ -247,8 +262,8 @@ async def test_media_player_playback(client: HAClient, fake_ha: FakeHA) -> None:
     await mp.previous()
     await mp.set_volume(0.5)
     await mp.mute(True)
-    await mp.turn_on()
-    await mp.turn_off()
+    await mp.power_on()
+    await mp.power_off()
     await mp.select_source("Spotify")
     services = [c["service"] for c in fake_ha.ws_service_calls]
     assert services == [

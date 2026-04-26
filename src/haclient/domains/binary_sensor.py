@@ -8,31 +8,69 @@ from ..entity import Entity
 
 
 class BinarySensor(Entity):
-    """A read-only Home Assistant binary sensor entity."""
+    """A read-only Home Assistant binary sensor entity.
+
+    Binary sensors represent boolean detection states (e.g. motion
+    detected, door open). They are read-only -- no actions are exposed.
+    Listener names use ``on_activate`` / ``on_deactivate`` to reflect
+    that the sensor itself does not "turn on" or "turn off".
+    """
 
     domain = "binary_sensor"
 
-    def on_turn_on(self, func: Any) -> Any:
-        """Register a listener for when the sensor activates.
+    # -- Listener decorators --
 
-        Callback: ``(old_state, new_state)``.
+    def on_activate(self, func: Any) -> Any:
+        """Register a listener for when the sensor activates (state becomes ``on``).
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         return self._register_state_transition_listener("on", func)
 
-    def on_turn_off(self, func: Any) -> Any:
-        """Register a listener for when the sensor deactivates.
+    def on_deactivate(self, func: Any) -> Any:
+        """Register a listener for when the sensor deactivates (state becomes ``off``).
 
-        Callback: ``(old_state, new_state)``.
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         return self._register_state_transition_listener("off", func)
 
+    # -- State properties --
+
     @property
     def is_on(self) -> bool:
-        """``True`` if the binary sensor is in the ``on`` state."""
+        """Check whether the binary sensor is in the ``on`` state.
+
+        Returns
+        -------
+        bool
+            ``True`` if the sensor is active.
+        """
         return self.state == "on"
 
     @property
     def device_class(self) -> str | None:
-        """The device class (e.g. ``"motion"``, ``"door"``)."""
+        """The device class (e.g. ``"motion"``, ``"door"``).
+
+        Returns
+        -------
+        str or None
+            The device class string, or ``None`` if not set.
+        """
         value = self.attributes.get("device_class")
         return str(value) if value is not None else None

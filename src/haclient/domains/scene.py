@@ -85,7 +85,7 @@ class Scene(Entity):
         data: dict[str, Any] | None = None
         if transition is not None:
             data = {"transition": transition}
-        await self.call_service("turn_on", data)
+        await self._call_service("turn_on", data)
 
     # -- Listener decorators --
 
@@ -95,6 +95,14 @@ class Scene(Entity):
         The listener fires whenever the scene's state changes (the timestamp
         is updated on each activation).
 
-        Callback: ``(old_state, new_state)``.
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
         """
         return self._register_state_value_listener(func)

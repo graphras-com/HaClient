@@ -22,6 +22,7 @@ from haclient.domains import (
     Scene,
     Sensor,
     Switch,
+    Timer,
 )
 from haclient.entity import Entity
 from haclient.exceptions import (
@@ -31,7 +32,6 @@ from haclient.exceptions import (
     EntityNotFoundError,
     HAClientError,
     TimeoutError,
-    UnsupportedOperationError,
 )
 from haclient.registry import EntityRegistry
 from haclient.sync import SyncHAClient
@@ -57,7 +57,7 @@ __all__ = [
     "Switch",
     "SyncHAClient",
     "TimeoutError",
-    "UnsupportedOperationError",
+    "Timer",
 ]
 
 __version__ = "0.1.0"

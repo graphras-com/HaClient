@@ -364,11 +364,11 @@ async def test_switch_on_turn_off(client: HAClient, fake_ha: FakeHA) -> None:
     assert captured == [("on", "off")]
 
 
-async def test_binary_sensor_on_turn_on(client: HAClient, fake_ha: FakeHA) -> None:
+async def test_binary_sensor_on_activate(client: HAClient, fake_ha: FakeHA) -> None:
     sensor = client.binary_sensor("motion")
     captured: list[tuple[Any, Any]] = []
 
-    @sensor.on_turn_on
+    @sensor.on_activate
     def handler(old: Any, new: Any) -> None:
         captured.append((old, new))
 
@@ -381,11 +381,11 @@ async def test_binary_sensor_on_turn_on(client: HAClient, fake_ha: FakeHA) -> No
     assert captured == [("off", "on")]
 
 
-async def test_binary_sensor_on_turn_off(client: HAClient, fake_ha: FakeHA) -> None:
+async def test_binary_sensor_on_deactivate(client: HAClient, fake_ha: FakeHA) -> None:
     sensor = client.binary_sensor("motion")
     captured: list[tuple[Any, Any]] = []
 
-    @sensor.on_turn_off
+    @sensor.on_deactivate
     def handler(old: Any, new: Any) -> None:
         captured.append((old, new))
 
@@ -715,3 +715,54 @@ async def test_null_old_state_handling(client: HAClient, fake_ha: FakeHA) -> Non
     )
     await asyncio.sleep(0.05)
     assert captured == [(None, "on")]
+
+
+async def test_timer_on_start(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_start
+    def handler(old: Any, new: Any) -> None:
+        captured.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "active", "attributes": {}},
+        {"state": "idle", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert captured == [("idle", "active")]
+
+
+async def test_timer_on_pause(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_pause
+    def handler(old: Any, new: Any) -> None:
+        captured.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "paused", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert captured == [("active", "paused")]
+
+
+async def test_timer_on_idle(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_idle
+    def handler(old: Any, new: Any) -> None:
+        captured.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert captured == [("active", "idle")]

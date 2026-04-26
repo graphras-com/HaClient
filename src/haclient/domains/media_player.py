@@ -9,6 +9,7 @@ playable items.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -23,7 +24,18 @@ _MAX_BROWSE_DEPTH = 6
 
 
 def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
-    """Build a `NowPlaying` from a raw HA attributes dict."""
+    """Build a `NowPlaying` from a raw HA attributes dict.
+
+    Parameters
+    ----------
+    attrs : dict
+        Raw attributes dictionary from Home Assistant.
+
+    Returns
+    -------
+    NowPlaying
+        A structured snapshot of the currently playing media.
+    """
     features = attrs.get("supported_features") or 0
     return NowPlaying(
         source=attrs.get("source"),
@@ -187,7 +199,13 @@ class FavoriteItem:
 
 
 class MediaPlayer(Entity):
-    """A Home Assistant media player entity."""
+    """A Home Assistant media player entity.
+
+    Provides intent-specific methods for playback control (``play``,
+    ``pause``, ``stop``, ``next``, ``previous``), volume management
+    (``set_volume``, ``mute``), power control (``power_on``,
+    ``power_off``), source selection, and media browsing/favorites.
+    """
 
     domain = "media_player"
 
@@ -195,12 +213,36 @@ class MediaPlayer(Entity):
         super().__init__(entity_id, client)
         self._media_change_listeners: list[ValueChangeHandler] = []
 
+    # -- Listener decorators --
+
     def on_volume_change(self, func: Any) -> Any:
-        """Register a listener for volume level changes. Callback: ``(old, new)``."""
+        """Register a listener for volume level changes.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_volume, new_volume)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
+        """
         return self._register_attr_listener("volume_level", func)
 
     def on_mute_change(self, func: Any) -> Any:
-        """Register a listener for mute state changes. Callback: ``(old, new)``."""
+        """Register a listener for mute state changes.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_muted, new_muted)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
+        """
         return self._register_attr_listener("is_volume_muted", func)
 
     def on_media_change(self, func: Any) -> Any:
@@ -227,15 +269,48 @@ class MediaPlayer(Entity):
         return func
 
     def on_play(self, func: Any) -> Any:
-        """Register a listener for when playback starts. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when playback starts.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
+        """
         return self._register_state_transition_listener("playing", func)
 
     def on_pause(self, func: Any) -> Any:
-        """Register a listener for when playback pauses. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when playback pauses.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
+        """
         return self._register_state_transition_listener("paused", func)
 
     def on_stop(self, func: Any) -> Any:
-        """Register a listener for when playback stops. Callback: ``(old_state, new_state)``."""
+        """Register a listener for when playback stops.
+
+        Parameters
+        ----------
+        func : callable
+            Callback with signature ``(old_state, new_state)``.
+
+        Returns
+        -------
+        callable
+            The same *func*, for use as a decorator.
+        """
         return self._register_state_transition_listener("idle", func)
 
     def _dispatch_granular_events(
@@ -254,63 +329,101 @@ class MediaPlayer(Entity):
                 self._schedule_value(listener, old_np, new_np)
 
     def remove_granular_listener(self, func: ValueChangeHandler) -> None:
-        """Remove a granular listener, including media-change listeners."""
-        import contextlib
+        """Remove a granular listener, including media-change listeners.
 
+        Parameters
+        ----------
+        func : callable
+            The listener function to remove.
+        """
         with contextlib.suppress(ValueError):
             self._media_change_listeners.remove(func)
             return
         super().remove_granular_listener(func)
 
+    # -- State properties --
+
     @property
     def is_playing(self) -> bool:
-        """``True`` if the media player is currently playing."""
+        """Check whether the media player is currently playing.
+
+        Returns
+        -------
+        bool
+            ``True`` if playing.
+        """
         return self.state == "playing"
 
     @property
     def is_paused(self) -> bool:
-        """``True`` if the media player is currently paused."""
+        """Check whether the media player is currently paused.
+
+        Returns
+        -------
+        bool
+            ``True`` if paused.
+        """
         return self.state == "paused"
 
     @property
     def is_muted(self) -> bool:
-        """``True`` if the media player is currently muted."""
+        """Check whether the media player is currently muted.
+
+        Returns
+        -------
+        bool
+            ``True`` if muted.
+        """
         return bool(self.attributes.get("is_volume_muted"))
 
     @property
     def volume_level(self) -> float | None:
-        """Current volume level (``0.0`` – ``1.0``) or ``None`` if unknown."""
+        """Current volume level (``0.0`` -- ``1.0``) or ``None`` if unknown.
+
+        Returns
+        -------
+        float or None
+            The volume level.
+        """
         value = self.attributes.get("volume_level")
         return float(value) if isinstance(value, (int, float)) else None
 
     @property
     def now_playing(self) -> NowPlaying:
-        """Structured snapshot of the currently playing media."""
+        """Structured snapshot of the currently playing media.
+
+        Returns
+        -------
+        NowPlaying
+            The current playback metadata.
+        """
         return _now_playing_from_attrs(self.attributes)
+
+    # -- Actions --
 
     async def play(self) -> None:
         """Resume / start playback."""
-        await self.call_service("media_play")
+        await self._call_service("media_play")
 
     async def pause(self) -> None:
         """Pause playback."""
-        await self.call_service("media_pause")
+        await self._call_service("media_pause")
 
     async def play_pause(self) -> None:
         """Toggle play/pause."""
-        await self.call_service("media_play_pause")
+        await self._call_service("media_play_pause")
 
     async def stop(self) -> None:
         """Stop playback."""
-        await self.call_service("media_stop")
+        await self._call_service("media_stop")
 
     async def next(self) -> None:
         """Skip to the next track."""
-        await self.call_service("media_next_track")
+        await self._call_service("media_next_track")
 
     async def previous(self) -> None:
         """Skip to the previous track."""
-        await self.call_service("media_previous_track")
+        await self._call_service("media_previous_track")
 
     async def set_volume(self, level: float) -> None:
         """Set the volume level.
@@ -327,7 +440,7 @@ class MediaPlayer(Entity):
         """
         if not 0.0 <= level <= 1.0:
             raise ValueError("Volume level must be between 0.0 and 1.0")
-        await self.call_service("volume_set", {"volume_level": float(level)})
+        await self._call_service("volume_set", {"volume_level": float(level)})
 
     async def mute(self, muted: bool = True) -> None:
         """Mute or unmute the media player.
@@ -337,15 +450,15 @@ class MediaPlayer(Entity):
         muted : bool, optional
             ``True`` to mute, ``False`` to unmute.
         """
-        await self.call_service("volume_mute", {"is_volume_muted": bool(muted)})
+        await self._call_service("volume_mute", {"is_volume_muted": bool(muted)})
 
-    async def turn_on(self) -> None:
+    async def power_on(self) -> None:
         """Power the media player on."""
-        await self.call_service("turn_on")
+        await self._call_service("turn_on")
 
-    async def turn_off(self) -> None:
+    async def power_off(self) -> None:
         """Power the media player off."""
-        await self.call_service("turn_off")
+        await self._call_service("turn_off")
 
     async def select_source(self, source: str) -> None:
         """Select an input source.
@@ -355,7 +468,7 @@ class MediaPlayer(Entity):
         source : str
             The source name to select.
         """
-        await self.call_service("select_source", {"source": source})
+        await self._call_service("select_source", {"source": source})
 
     async def play_media(
         self,
@@ -379,7 +492,7 @@ class MediaPlayer(Entity):
             "media_content_id": media_content_id,
             **extra,
         }
-        await self.call_service("play_media", data)
+        await self._call_service("play_media", data)
 
     async def browse_media(
         self,

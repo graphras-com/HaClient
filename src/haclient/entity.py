@@ -69,7 +69,14 @@ class Entity:
         client.registry.register(self)
 
     def _apply_state(self, state_obj: dict[str, Any] | None) -> None:
-        """Apply a raw state object (as returned by Home Assistant)."""
+        """Apply a raw state object (as returned by Home Assistant).
+
+        Parameters
+        ----------
+        state_obj : dict or None
+            The state dictionary from Home Assistant, or ``None`` to mark
+            the entity as unavailable.
+        """
         if state_obj is None:
             self.state = "unavailable"
             self.attributes = {}
@@ -83,7 +90,15 @@ class Entity:
         old_state: dict[str, Any] | None,
         new_state: dict[str, Any] | None,
     ) -> None:
-        """Update local state and dispatch listeners."""
+        """Update local state and dispatch listeners.
+
+        Parameters
+        ----------
+        old_state : dict or None
+            The previous state object.
+        new_state : dict or None
+            The new state object.
+        """
         self._apply_state(new_state)
         for listener in list(self._listeners):
             self._schedule(listener, old_state, new_state)
@@ -94,7 +109,15 @@ class Entity:
         old_state: dict[str, Any] | None,
         new_state: dict[str, Any] | None,
     ) -> None:
-        """Dispatch attribute-level and state-transition events."""
+        """Dispatch attribute-level and state-transition events.
+
+        Parameters
+        ----------
+        old_state : dict or None
+            The previous state object.
+        new_state : dict or None
+            The new state object.
+        """
         old_state_str = (old_state or {}).get("state")
         new_state_str = (new_state or {}).get("state")
         old_attrs = (old_state or {}).get("attributes") or {}
@@ -217,7 +240,13 @@ class Entity:
         return func
 
     def remove_granular_listener(self, func: ValueChangeHandler) -> None:
-        """Remove a previously registered granular (attribute/state) listener."""
+        """Remove a previously registered granular (attribute/state) listener.
+
+        Parameters
+        ----------
+        func : callable
+            The listener function to remove.
+        """
         for listeners in self._attr_listeners.values():
             with contextlib.suppress(ValueError):
                 listeners.remove(func)
@@ -251,13 +280,25 @@ class Entity:
         return func
 
     def remove_listener(self, func: StateChangeHandler) -> None:
-        """Remove a previously registered state change listener."""
+        """Remove a previously registered state change listener.
+
+        Parameters
+        ----------
+        func : callable
+            The listener function to remove.
+        """
         with contextlib.suppress(ValueError):
             self._listeners.remove(func)
 
     @property
     def available(self) -> bool:
-        """Return ``True`` if the entity is currently available."""
+        """Return ``True`` if the entity is currently available.
+
+        Returns
+        -------
+        bool
+            ``True`` if the entity state is not ``"unavailable"`` or ``"unknown"``.
+        """
         return self.state not in {"unavailable", "unknown"}
 
     async def async_refresh(self) -> None:
@@ -265,7 +306,7 @@ class Entity:
         state = await self._client.rest.get_state(self.entity_id)
         self._apply_state(state)
 
-    async def call_service(
+    async def _call_service(
         self,
         service: str,
         data: dict[str, Any] | None = None,
@@ -275,6 +316,8 @@ class Entity:
         """Call a Home Assistant service targeting this entity.
 
         The ``entity_id`` is injected automatically into the service data.
+        This is a private helper -- domain subclasses should expose
+        intent-specific public methods rather than raw service calls.
 
         Parameters
         ----------
@@ -293,7 +336,7 @@ class Entity:
         payload: dict[str, Any] = {"entity_id": self.entity_id}
         if data:
             payload.update(data)
-        return await self._client.call_service(domain or self.domain, service, payload)
+        return await self._client._call_service(domain or self.domain, service, payload)
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.entity_id} state={self.state!r}>"

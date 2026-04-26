@@ -47,18 +47,16 @@ async def test_sync_client_basic_operations(fake_ha: FakeHA) -> None:
     assert services == ["media_play", "volume_set"]
 
 
-async def test_sync_client_call_service(fake_ha: FakeHA) -> None:
+async def test_sync_client_refresh(fake_ha: FakeHA) -> None:
     def run() -> None:
         client = SyncHAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
         try:
             client.connect()
-            client.call_service("light", "turn_on", {"entity_id": "light.kitchen"})
             client.refresh_all()
         finally:
             client.close()
 
     await asyncio.get_running_loop().run_in_executor(None, run)
-    assert any(c["service"] == "turn_on" for c in fake_ha.ws_service_calls)
 
 
 async def test_sync_proxy_passes_non_coroutine_attrs(fake_ha: FakeHA) -> None:
@@ -103,6 +101,8 @@ async def test_sync_client_all_accessors(fake_ha: FakeHA) -> None:
                 "cover": client.cover("v").entity_id,
                 "sensor": client.sensor("t").entity_id,
                 "binary_sensor": client.binary_sensor("b").entity_id,
+                "scene": client.scene("sc").entity_id,
+                "timer": client.timer("tm").entity_id,
             }
             light = client.light("l")
             light.state = "on"
@@ -120,3 +120,5 @@ async def test_sync_client_all_accessors(fake_ha: FakeHA) -> None:
     assert names["cover"] == "cover.v"
     assert names["sensor"] == "sensor.t"
     assert names["binary_sensor"] == "binary_sensor.b"
+    assert names["scene"] == "scene.sc"
+    assert names["timer"] == "timer.tm"
