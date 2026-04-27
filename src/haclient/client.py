@@ -115,6 +115,8 @@ class HAClient:
             verify_ssl=verify_ssl,
         )
         self._state_sub_id: int | None = None
+        self._timer_finished_sub_id: int | None = None
+        self._timer_cancelled_sub_id: int | None = None
         self._connected = False
 
     async def __aenter__(self) -> HAClient:
@@ -157,6 +159,12 @@ class HAClient:
         self._state_sub_id = await self.ws.subscribe_events(
             self._on_state_changed_event, "state_changed"
         )
+        self._timer_finished_sub_id = await self.ws.subscribe_events(
+            self._on_timer_event, "timer.finished"
+        )
+        self._timer_cancelled_sub_id = await self.ws.subscribe_events(
+            self._on_timer_event, "timer.cancelled"
+        )
         self._connected = True
 
     async def close(self) -> None:
@@ -183,6 +191,26 @@ class HAClient:
         entity._handle_state_changed(  # noqa: SLF001
             data.get("old_state"), data.get("new_state")
         )
+
+    def _on_timer_event(self, event: dict[str, Any]) -> None:
+        """Dispatch a ``timer.finished`` or ``timer.cancelled`` event.
+
+        Parameters
+        ----------
+        event : dict
+            The raw event payload from the WebSocket.
+        """
+        from .domains.timer import Timer as _Timer
+
+        event_type = event.get("event_type", "")
+        data = event.get("data") or {}
+        eid = data.get("entity_id")
+        if not isinstance(eid, str):
+            return
+        entity = self.registry.get(eid)
+        if entity is None or not isinstance(entity, _Timer):
+            return
+        entity._handle_timer_event(event_type, data)  # noqa: SLF001
 
     async def _call_service(
         self,

@@ -468,3 +468,94 @@ async def test_scene_on_activate_listener(client: HAClient, fake_ha: FakeHA) -> 
     await asyncio.sleep(0.05)
     assert len(fired) == 1
     assert fired[0][1] == "2024-06-15T20:30:00+00:00"
+
+
+async def test_timer_time_remaining_active() -> None:
+    """``time_remaining`` computes live seconds from ``finishes_at`` when active."""
+    import datetime
+
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("remaining_timer")
+        # Set finishes_at to 120 seconds from now
+        finish = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=120)
+        t._apply_state(
+            {
+                "state": "active",
+                "attributes": {
+                    "duration": "0:02:00",
+                    "remaining": "0:02:00",
+                    "finishes_at": finish.isoformat(),
+                },
+            }
+        )
+        rem = t.time_remaining
+        assert rem is not None
+        # Should be close to 120s (allow some tolerance for test execution)
+        assert 118.0 <= rem <= 121.0
+    finally:
+        await ha.close()
+
+
+async def test_timer_time_remaining_paused() -> None:
+    """``time_remaining`` parses remaining attribute when paused."""
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("paused_timer")
+        t._apply_state(
+            {
+                "state": "paused",
+                "attributes": {"duration": "0:05:00", "remaining": "0:03:30"},
+            }
+        )
+        rem = t.time_remaining
+        assert rem is not None
+        assert rem == 210.0  # 3 min 30 sec
+    finally:
+        await ha.close()
+
+
+async def test_timer_time_remaining_idle() -> None:
+    """``time_remaining`` returns ``None`` when idle."""
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("idle_timer")
+        t._apply_state({"state": "idle", "attributes": {"duration": "0:05:00"}})
+        assert t.time_remaining is None
+    finally:
+        await ha.close()
+
+
+async def test_timer_time_remaining_missing_attrs() -> None:
+    """``time_remaining`` returns ``None`` when attributes are missing."""
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("no_attrs_timer")
+        t._apply_state({"state": "active", "attributes": {}})
+        assert t.time_remaining is None
+        t._apply_state({"state": "paused", "attributes": {}})
+        assert t.time_remaining is None
+    finally:
+        await ha.close()
+
+
+async def test_timer_time_remaining_bad_finishes_at() -> None:
+    """``time_remaining`` returns ``None`` for unparseable ``finishes_at``."""
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("bad_timer")
+        t._apply_state({"state": "active", "attributes": {"finishes_at": "not-a-date"}})
+        assert t.time_remaining is None
+    finally:
+        await ha.close()
+
+
+async def test_timer_time_remaining_bad_remaining() -> None:
+    """``time_remaining`` returns ``None`` for unparseable ``remaining``."""
+    ha = HAClient("http://x", "t")
+    try:
+        t = ha.timer("bad_rem_timer")
+        t._apply_state({"state": "paused", "attributes": {"remaining": "bad"}})
+        assert t.time_remaining is None
+    finally:
+        await ha.close()

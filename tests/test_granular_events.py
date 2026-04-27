@@ -766,3 +766,76 @@ async def test_timer_on_idle(client: HAClient, fake_ha: FakeHA) -> None:
     )
     await asyncio.sleep(0.05)
     assert captured == [("active", "idle")]
+
+
+async def test_timer_on_finished(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_finished
+    def handler(entity_id: Any, data: Any) -> None:
+        captured.append((entity_id, data))
+
+    await fake_ha.push_event(
+        "timer.finished",
+        {"data": {"entity_id": "timer.my_timer"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(captured) == 1
+    assert captured[0][0] == "timer.my_timer"
+
+
+async def test_timer_on_cancelled(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_cancelled
+    def handler(entity_id: Any, data: Any) -> None:
+        captured.append((entity_id, data))
+
+    await fake_ha.push_event(
+        "timer.cancelled",
+        {"data": {"entity_id": "timer.my_timer"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(captured) == 1
+    assert captured[0][0] == "timer.my_timer"
+
+
+async def test_timer_on_finished_ignores_other_entities(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    captured: list[tuple[Any, Any]] = []
+
+    @t.on_finished
+    def handler(entity_id: Any, data: Any) -> None:
+        captured.append((entity_id, data))
+
+    # Fire event for a different timer entity
+    await fake_ha.push_event(
+        "timer.finished",
+        {"data": {"entity_id": "timer.other_timer"}},
+    )
+    await asyncio.sleep(0.05)
+    assert captured == []
+
+
+async def test_timer_on_finished_does_not_fire_on_cancel(client: HAClient, fake_ha: FakeHA) -> None:
+    t = client.timer("my_timer")
+    finished: list[tuple[Any, Any]] = []
+    cancelled: list[tuple[Any, Any]] = []
+
+    @t.on_finished
+    def on_fin(entity_id: Any, data: Any) -> None:
+        finished.append((entity_id, data))
+
+    @t.on_cancelled
+    def on_can(entity_id: Any, data: Any) -> None:
+        cancelled.append((entity_id, data))
+
+    await fake_ha.push_event(
+        "timer.cancelled",
+        {"data": {"entity_id": "timer.my_timer"}},
+    )
+    await asyncio.sleep(0.05)
+    assert finished == []
+    assert len(cancelled) == 1
