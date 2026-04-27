@@ -429,6 +429,73 @@ class HAClient:
 
         return self._get_or_create("scene", name, _Scene)
 
+    async def create_scene(
+        self,
+        scene_id: str,
+        entities: dict[str, dict[str, Any]],
+        *,
+        snapshot_entities: list[str] | None = None,
+    ) -> Scene:
+        """Create a dynamic scene and return the `Scene` object.
+
+        This calls the ``scene.create`` service, which creates (or updates)
+        a scene at runtime.  The resulting scene can later be deleted with
+        `Scene.delete`.
+
+        Parameters
+        ----------
+        scene_id : str
+            The object-id for the new scene (e.g. ``"romantic"`` becomes
+            ``scene.romantic``).
+        entities : dict[str, dict[str, Any]]
+            Mapping of entity IDs to the state/attribute dicts that the
+            scene should apply.  For example::
+
+                {"light.ceiling": {"state": "on", "brightness": 120}}
+        snapshot_entities : list of str or None, optional
+            Entity IDs whose **current** state should be captured into
+            the scene instead of using explicit values.
+
+        Returns
+        -------
+        Scene
+            The newly created (or updated) `Scene` instance.
+        """
+        from .domains.scene import Scene as _Scene
+
+        data: dict[str, Any] = {
+            "scene_id": scene_id,
+            "entities": entities,
+        }
+        if snapshot_entities is not None:
+            data["snapshot_entities"] = snapshot_entities
+
+        await self._call_service("scene", "create", data)
+        return self._get_or_create("scene", scene_id, _Scene)
+
+    async def apply_scene(
+        self,
+        entities: dict[str, dict[str, Any]],
+        *,
+        transition: float | None = None,
+    ) -> None:
+        """Apply entity states without creating a persistent scene.
+
+        This calls the ``scene.apply`` service.  It works like activating
+        a scene, but the state combination is not saved.
+
+        Parameters
+        ----------
+        entities : dict[str, dict[str, Any]]
+            Mapping of entity IDs to desired state/attribute dicts.
+        transition : float or None, optional
+            Transition time in seconds for entities that support it.
+        """
+        data: dict[str, Any] = {"entities": entities}
+        if transition is not None:
+            data["transition"] = transition
+        await self._call_service("scene", "apply", data)
+
     def timer(self, name: str | None = None, *, persistent: bool = False) -> Timer:
         """Return a `Timer`, creating the Python object if needed.
 

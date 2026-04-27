@@ -115,6 +115,74 @@ async def test_call_service_via_rest_fallback(fake_ha: FakeHA) -> None:
     assert fake_ha.rest_service_calls == [("switch", "toggle", {"entity_id": "switch.x"})]
 
 
+async def test_create_scene(fake_ha: FakeHA) -> None:
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+    try:
+        await ha.connect()
+        scene = await ha.create_scene(
+            "romantic",
+            {"light.ceiling": {"state": "on", "brightness": 80}},
+        )
+        assert scene.entity_id == "scene.romantic"
+        calls = fake_ha.ws_service_calls
+        assert len(calls) == 1
+        assert calls[0]["domain"] == "scene"
+        assert calls[0]["service"] == "create"
+        assert calls[0]["service_data"]["scene_id"] == "romantic"
+        assert calls[0]["service_data"]["entities"] == {
+            "light.ceiling": {"state": "on", "brightness": 80}
+        }
+    finally:
+        await ha.close()
+
+
+async def test_create_scene_with_snapshot(fake_ha: FakeHA) -> None:
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+    try:
+        await ha.connect()
+        scene = await ha.create_scene(
+            "snapshot_test",
+            {"light.ceiling": {"state": "on"}},
+            snapshot_entities=["light.lamp"],
+        )
+        assert scene.entity_id == "scene.snapshot_test"
+        calls = fake_ha.ws_service_calls
+        assert calls[0]["service_data"]["snapshot_entities"] == ["light.lamp"]
+    finally:
+        await ha.close()
+
+
+async def test_apply_scene(fake_ha: FakeHA) -> None:
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+    try:
+        await ha.connect()
+        await ha.apply_scene({"light.ceiling": {"state": "on", "brightness": 200}})
+        calls = fake_ha.ws_service_calls
+        assert len(calls) == 1
+        assert calls[0]["domain"] == "scene"
+        assert calls[0]["service"] == "apply"
+        assert calls[0]["service_data"]["entities"] == {
+            "light.ceiling": {"state": "on", "brightness": 200}
+        }
+        assert "transition" not in calls[0]["service_data"]
+    finally:
+        await ha.close()
+
+
+async def test_apply_scene_with_transition(fake_ha: FakeHA) -> None:
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+    try:
+        await ha.connect()
+        await ha.apply_scene(
+            {"light.ceiling": {"state": "on"}},
+            transition=3.0,
+        )
+        calls = fake_ha.ws_service_calls
+        assert calls[0]["service_data"]["transition"] == 3.0
+    finally:
+        await ha.close()
+
+
 async def test_invalid_entity_id_direct_construction() -> None:
     ha = HAClient("http://x", "t")
     from haclient import Light

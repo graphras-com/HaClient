@@ -122,3 +122,32 @@ async def test_sync_client_all_accessors(fake_ha: FakeHA) -> None:
     assert names["binary_sensor"] == "binary_sensor.b"
     assert names["scene"] == "scene.sc"
     assert names["timer"] == "timer.tm"
+
+
+async def test_sync_create_scene(fake_ha: FakeHA) -> None:
+    def run() -> str:
+        client = SyncHAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+        try:
+            client.connect()
+            scene = client.create_scene(
+                "romantic",
+                {"light.ceiling": {"state": "on", "brightness": 80}},
+            )
+            return scene.entity_id  # type: ignore[no-any-return]
+        finally:
+            client.close()
+
+    eid = await asyncio.get_running_loop().run_in_executor(None, run)
+    assert eid == "scene.romantic"
+
+
+async def test_sync_apply_scene(fake_ha: FakeHA) -> None:
+    def run() -> None:
+        client = SyncHAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
+        try:
+            client.connect()
+            client.apply_scene({"light.ceiling": {"state": "on"}})
+        finally:
+            client.close()
+
+    await asyncio.get_running_loop().run_in_executor(None, run)

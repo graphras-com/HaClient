@@ -470,6 +470,16 @@ async def test_scene_on_activate_listener(client: HAClient, fake_ha: FakeHA) -> 
     assert fired[0][1] == "2024-06-15T20:30:00+00:00"
 
 
+async def test_scene_delete(client: HAClient, fake_ha: FakeHA) -> None:
+    sc = client.scene("romantic")
+    await sc.delete()
+    calls = fake_ha.ws_service_calls
+    assert len(calls) == 1
+    assert calls[0]["domain"] == "scene"
+    assert calls[0]["service"] == "delete"
+    assert calls[0]["service_data"]["entity_id"] == "scene.romantic"
+
+
 async def test_timer_time_remaining_active() -> None:
     """``time_remaining`` computes live seconds from ``finishes_at`` when active."""
     import datetime

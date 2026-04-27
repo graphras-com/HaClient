@@ -1,4 +1,13 @@
-"""``scene`` domain implementation."""
+"""``scene`` domain implementation.
+
+Scenes apply a pre-defined set of entity states in one shot.  They are
+fire-and-forget: there is no ``turn_off`` counterpart.  The entity
+``state`` is the ISO-8601 timestamp of the last activation (or
+``"unavailable"`` / ``"unknown"`` when not applicable).
+
+Dynamic scenes (created via `HAClient.create_scene`) can also be
+deleted through the `Scene.delete` method.
+"""
 
 from __future__ import annotations
 
@@ -86,6 +95,20 @@ class Scene(Entity):
         if transition is not None:
             data = {"transition": transition}
         await self._call_service("turn_on", data)
+
+    async def delete(self) -> None:
+        """Delete this dynamically-created scene.
+
+        Only scenes created via ``HAClient.create_scene`` (i.e. the
+        ``scene.create`` service) can be deleted.  Attempting to delete
+        a YAML-defined scene will raise an error from Home Assistant.
+
+        Raises
+        ------
+        HAClientError
+            If Home Assistant rejects the deletion.
+        """
+        await self._call_service("delete")
 
     # -- Listener decorators --
 
