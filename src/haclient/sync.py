@@ -254,6 +254,51 @@ class SyncHAClient:
         """
         return _SyncProxy(self._client.scene(name), self._loop_thread)
 
+    def create_scene(
+        self,
+        scene_id: str,
+        entities: dict[str, dict[str, Any]],
+        *,
+        snapshot_entities: list[str] | None = None,
+    ) -> Any:
+        """Create a dynamic scene synchronously.
+
+        Parameters
+        ----------
+        scene_id : str
+            The object-id for the new scene.
+        entities : dict[str, dict[str, Any]]
+            Mapping of entity IDs to desired state/attribute dicts.
+        snapshot_entities : list of str or None, optional
+            Entity IDs whose current state should be captured.
+
+        Returns
+        -------
+        Any
+            A sync proxy wrapping the new `Scene`.
+        """
+        scene = self._loop_thread.submit(
+            self._client.create_scene(scene_id, entities, snapshot_entities=snapshot_entities)
+        )
+        return _SyncProxy(scene, self._loop_thread)
+
+    def apply_scene(
+        self,
+        entities: dict[str, dict[str, Any]],
+        *,
+        transition: float | None = None,
+    ) -> None:
+        """Apply entity states without creating a persistent scene.
+
+        Parameters
+        ----------
+        entities : dict[str, dict[str, Any]]
+            Mapping of entity IDs to desired state/attribute dicts.
+        transition : float or None, optional
+            Transition time in seconds.
+        """
+        self._loop_thread.submit(self._client.apply_scene(entities, transition=transition))
+
     def timer(self, name: str) -> Any:
         """Return a sync proxy wrapping the async `Timer`.
 

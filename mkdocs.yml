@@ -35,6 +35,7 @@ nav:
           - Sensor: reference/domains/sensor.md
           - Binary Sensor: reference/domains/binary_sensor.md
           - Media Player: reference/domains/media_player.md
+          - Scene: reference/domains/scene.md
           - Timer: reference/domains/timer.md
 
 plugins:
