@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import datetime
 import logging
+import uuid
 from typing import Any
 
 from ..entity import Entity, ValueChangeHandler
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _generate_timer_id() -> str:
+    """Generate a short unique object-id for an ephemeral timer.
+
+    Returns
+    -------
+    str
+        A string like ``"haclient_a1b2c3d4"``.
+    """
+    return f"haclient_{uuid.uuid4().hex[:8]}"
 
 
 class Timer(Entity):
@@ -18,11 +30,14 @@ class Timer(Entity):
     Actions use intent-specific names: ``start``, ``pause``, ``cancel``,
     ``finish``, ``change``.
 
-    If the timer helper does not yet exist in Home Assistant, it is created
-    automatically via the ``timer/create`` WebSocket command the first time
-    an action method (``start``, ``pause``, etc.) is called.  This means
-    users never need to pre-create timer helpers — the library handles it
-    transparently.
+    Timers are **ephemeral by default**: the HA helper is created
+    automatically on the first action and deleted when the timer returns
+    to idle (natural finish or cancellation).  The same ``Timer`` object
+    can be restarted afterwards — the helper is transparently re-created.
+
+    Pass ``persistent=True`` to keep the HA helper alive after the timer
+    finishes.  Persistent timers require an explicit *name*; ephemeral
+    timers auto-generate one when no name is provided.
 
     In addition to the generic ``on_idle`` listener (which fires for both
     natural expiry and explicit cancellation), the timer provides
@@ -33,15 +48,37 @@ class Timer(Entity):
     The ``time_remaining`` property computes the live seconds remaining
     from ``finishes_at`` when the timer is active, or parses the
     ``remaining`` attribute when paused.
+
+    Parameters
+    ----------
+    entity_id : str
+        Fully-qualified entity id (e.g. ``"timer.my_timer"``).
+    client : HAClient
+        The owning client instance.
+    persistent : bool, optional
+        If ``False`` (default), the HA helper is deleted automatically
+        when the timer returns to idle.
     """
 
     domain = "timer"
 
-    def __init__(self, entity_id: str, client: Any) -> None:
+    def __init__(self, entity_id: str, client: Any, *, persistent: bool = False) -> None:
         super().__init__(entity_id, client)
         self._finished_listeners: list[ValueChangeHandler] = []
         self._cancelled_listeners: list[ValueChangeHandler] = []
         self._ensured: bool = False
+        self._persistent: bool = persistent
+
+    @property
+    def persistent(self) -> bool:
+        """Whether this timer keeps its HA helper after returning to idle.
+
+        Returns
+        -------
+        bool
+            ``True`` if the timer is persistent.
+        """
+        return self._persistent
 
     # -- State properties --
 
@@ -149,6 +186,46 @@ class Timer(Entity):
         return None
 
     # -- Lifecycle --
+
+    def _handle_state_changed(
+        self,
+        old_state: dict[str, Any] | None,
+        new_state: dict[str, Any] | None,
+    ) -> None:
+        """Update state, dispatch listeners, then auto-delete if ephemeral.
+
+        For non-persistent timers, the HA helper is deleted when the timer
+        transitions to ``idle``.  The cleanup runs *after* all user listeners
+        have been dispatched so that callbacks see the final state.
+
+        Parameters
+        ----------
+        old_state : dict or None
+            The previous state object.
+        new_state : dict or None
+            The new state object.
+        """
+        old_state_str = (old_state or {}).get("state")
+        super()._handle_state_changed(old_state, new_state)
+
+        if (
+            not self._persistent
+            and self.state == "idle"
+            and old_state_str is not None
+            and old_state_str != "idle"
+        ):
+            self._schedule_value(self._auto_cleanup, old_state_str, self.state)
+
+    async def _auto_cleanup(self, _old: Any, _new: Any) -> None:
+        """Delete the HA helper and reset internal state for re-creation.
+
+        This is scheduled as a task after user listeners have been invoked.
+        """
+        try:
+            await self.delete()
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Auto-cleanup of %s failed", self.entity_id, exc_info=True)
+        self.state = "unknown"
 
     async def _ensure_exists(self) -> None:
         """Create the timer helper in Home Assistant if it does not exist.

@@ -1,10 +1,18 @@
-"""Tests for Timer auto-create and delete lifecycle."""
+"""Tests for Timer auto-create, delete, ephemeral and persistent lifecycle."""
 
 from __future__ import annotations
+
+import asyncio
+
+import pytest
 
 from haclient import HAClient
 
 from .fake_ha import FakeHA
+
+# ---------------------------------------------------------------------------
+# Auto-create (unchanged behaviour)
+# ---------------------------------------------------------------------------
 
 
 async def test_timer_start_auto_creates_when_unknown(client: HAClient, fake_ha: FakeHA) -> None:
@@ -14,9 +22,6 @@ async def test_timer_start_auto_creates_when_unknown(client: HAClient, fake_ha: 
 
     await t.start(duration="00:00:10")
 
-    # The timer/create command should have been sent (check ws_service_calls
-    # won't capture it — we need to check via the call_service call that followed).
-    # The call_service for timer.start should be present.
     assert len(fake_ha.ws_service_calls) == 1
     call = fake_ha.ws_service_calls[0]
     assert call["domain"] == "timer"
@@ -27,13 +32,11 @@ async def test_timer_start_auto_creates_when_unknown(client: HAClient, fake_ha: 
 async def test_timer_start_skips_create_when_state_known(client: HAClient, fake_ha: FakeHA) -> None:
     """If the timer already has a state from HA, _ensure_exists is a no-op."""
     t = client.timer("my_timer")
-    # Simulate that HA already reported the entity's state.
     t._apply_state({"state": "idle", "attributes": {"duration": "0:01:00"}})
     assert t.state == "idle"
 
     await t.start(duration="00:00:10")
 
-    # Only the service call, no timer/create.
     assert len(fake_ha.ws_service_calls) == 1
     call = fake_ha.ws_service_calls[0]
     assert call["domain"] == "timer"
@@ -48,7 +51,6 @@ async def test_timer_ensure_exists_only_called_once(client: HAClient, fake_ha: F
     await t.start(duration="00:00:10")
     await t.pause()
 
-    # Both actions should fire, but timer/create only once.
     assert len(fake_ha.ws_service_calls) == 2
     assert t._ensured is True
 
@@ -85,7 +87,6 @@ async def test_timer_change_auto_creates(client: HAClient, fake_ha: FakeHA) -> N
 async def test_timer_delete(client: HAClient, fake_ha: FakeHA) -> None:
     """delete() sends timer/delete and resets _ensured."""
     t = client.timer("my_timer")
-    # First ensure it exists.
     await t.start()
     assert t._ensured is True
 
@@ -102,7 +103,225 @@ async def test_timer_delete_then_start_recreates(client: HAClient, fake_ha: Fake
     await t.delete()
     assert t._ensured is False
 
-    # Reset state to unknown to simulate the entity being gone.
     t.state = "unknown"
     await t.start()
     assert t._ensured is True
+
+
+# ---------------------------------------------------------------------------
+# Ephemeral timers (default)
+# ---------------------------------------------------------------------------
+
+
+async def test_ephemeral_timer_is_default(client: HAClient) -> None:
+    """Timers are ephemeral by default."""
+    t = client.timer("my_timer")
+    assert t.persistent is False
+
+
+async def test_ephemeral_auto_deletes_on_idle(client: HAClient, fake_ha: FakeHA) -> None:
+    """An ephemeral timer auto-deletes its HA helper when it transitions to idle."""
+    t = client.timer("my_timer")
+    await t.start(duration="00:00:05")
+
+    # Simulate HA reporting active -> idle (timer finished).
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    assert t.state == "unknown"
+    assert t._ensured is False
+
+
+async def test_ephemeral_user_on_idle_fires_before_cleanup(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """User on_idle listeners fire even though the timer is ephemeral."""
+    t = client.timer("my_timer")
+    captured: list[tuple[str | None, str | None]] = []
+
+    @t.on_idle
+    def handler(old: str | None, new: str | None) -> None:
+        captured.append((old, new))
+
+    await t.start(duration="00:00:05")
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    assert captured == [("active", "idle")]
+
+
+async def test_ephemeral_can_restart_after_auto_delete(client: HAClient, fake_ha: FakeHA) -> None:
+    """After auto-delete, calling start() re-creates the timer transparently."""
+    t = client.timer("my_timer")
+    await t.start(duration="00:00:05")
+
+    # Trigger auto-delete.
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+    assert t._ensured is False
+    assert t.state == "unknown"
+
+    # Restart — should re-create.
+    await t.start(duration="00:00:10")
+    assert t._ensured is True
+
+
+async def test_ephemeral_no_cleanup_on_idle_to_idle(client: HAClient, fake_ha: FakeHA) -> None:
+    """No auto-delete when old_state is already idle (avoid spurious deletes)."""
+    t = client.timer("my_timer")
+    t._ensured = True
+
+    # idle -> idle should not trigger cleanup.
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "idle", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    # _ensured should remain True — no cleanup was triggered.
+    assert t._ensured is True
+
+
+async def test_ephemeral_no_cleanup_when_old_state_none(client: HAClient, fake_ha: FakeHA) -> None:
+    """No auto-delete when old_state is None (initial state load)."""
+    t = client.timer("my_timer")
+    t._ensured = True
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        None,
+    )
+    await asyncio.sleep(0.1)
+
+    assert t._ensured is True
+
+
+# ---------------------------------------------------------------------------
+# Persistent timers
+# ---------------------------------------------------------------------------
+
+
+async def test_persistent_timer_no_auto_delete(client: HAClient, fake_ha: FakeHA) -> None:
+    """A persistent timer does not auto-delete its HA helper on idle."""
+    t = client.timer("my_timer", persistent=True)
+    assert t.persistent is True
+    await t.start(duration="00:00:05")
+
+    await fake_ha.push_state_changed(
+        "timer.my_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    # State updated but _ensured not reset, state not reverted to unknown.
+    assert t.state == "idle"
+    assert t._ensured is True
+
+
+async def test_persistent_requires_name(client: HAClient) -> None:
+    """persistent=True without a name should raise ValueError."""
+    with pytest.raises(ValueError, match="Persistent timers require an explicit name"):
+        client.timer(persistent=True)
+
+
+# ---------------------------------------------------------------------------
+# Auto-generated names (unnamed ephemeral timers)
+# ---------------------------------------------------------------------------
+
+
+async def test_unnamed_ephemeral_generates_id(client: HAClient) -> None:
+    """Calling timer() without a name generates a unique entity id."""
+    t = client.timer()
+    assert t.entity_id.startswith("timer.haclient_")
+    assert len(t.entity_id) == len("timer.haclient_") + 8
+
+
+async def test_unnamed_ephemeral_unique_ids(client: HAClient) -> None:
+    """Each unnamed timer() call produces a different id."""
+    t1 = client.timer()
+    t2 = client.timer()
+    assert t1.entity_id != t2.entity_id
+
+
+async def test_named_ephemeral_uses_given_name(client: HAClient) -> None:
+    """Providing a name uses that name, not a generated one."""
+    t = client.timer("my_cooldown")
+    assert t.entity_id == "timer.my_cooldown"
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+async def test_ephemeral_auto_cleanup_handles_delete_failure(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """If the delete WS command fails, _auto_cleanup logs but still resets state."""
+    from aiohttp import web
+
+    async def fail_delete(server: FakeHA, ws: web.WebSocketResponse, msg: dict) -> None:
+        await ws.send_json(
+            {
+                "id": msg["id"],
+                "type": "result",
+                "success": False,
+                "error": {"code": "not_found", "message": "Timer not found"},
+            }
+        )
+
+    fake_ha.handlers["timer/delete"] = fail_delete
+
+    t = client.timer("will_fail")
+    await t.start(duration="00:00:05")
+
+    await fake_ha.push_state_changed(
+        "timer.will_fail",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    # Cleanup failed but state should still be reset.
+    assert t.state == "unknown"
+
+
+async def test_handle_timer_event_ignores_unknown_event_type(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """_handle_timer_event returns early for unrecognised event types."""
+    t = client.timer("my_timer")
+    captured: list[tuple] = []
+
+    @t.on_finished
+    def handler(eid: str, data: dict) -> None:
+        captured.append((eid, data))
+
+    # Push an event with a bogus type via the timer event handler directly.
+    t._handle_timer_event("timer.unknown_event", {"entity_id": "timer.my_timer"})
+    await asyncio.sleep(0.05)
+    assert captured == []
+
+
+async def test_parse_duration_invalid_format() -> None:
+    """_parse_duration_to_seconds returns None for non-HH:MM:SS strings."""
+    from haclient.domains.timer import _parse_duration_to_seconds
+
+    assert _parse_duration_to_seconds("invalid") is None
+    assert _parse_duration_to_seconds("abc:de:fg") is None
