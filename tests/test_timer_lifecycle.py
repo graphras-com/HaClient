@@ -241,6 +241,54 @@ async def test_persistent_requires_name(client: HAClient) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Pre-existing HA timers (not created by us)
+# ---------------------------------------------------------------------------
+
+
+async def test_preexisting_timer_not_auto_deleted(client: HAClient, fake_ha: FakeHA) -> None:
+    """A timer that already exists in HA must not be auto-deleted on idle."""
+    t = client.timer("existing_timer")
+    # Simulate HA reporting the timer during initial state fetch.
+    t._apply_state({"state": "idle", "attributes": {"duration": "0:05:00"}})
+    assert t.state == "idle"
+    assert t._created_by_us is False
+
+    # Start it (no timer/create because state is already known).
+    await t.start(duration="00:00:05")
+
+    # Simulate active -> idle.
+    await fake_ha.push_state_changed(
+        "timer.existing_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    # State should update normally but no auto-delete.
+    assert t.state == "idle"
+    assert t._created_by_us is False
+
+
+async def test_library_created_timer_auto_deletes(client: HAClient, fake_ha: FakeHA) -> None:
+    """A timer created by the library (via _ensure_exists) does auto-delete."""
+    t = client.timer("lib_timer")
+    assert t.state == "unknown"
+
+    await t.start(duration="00:00:05")
+    assert t._created_by_us is True
+
+    await fake_ha.push_state_changed(
+        "timer.lib_timer",
+        {"state": "idle", "attributes": {}},
+        {"state": "active", "attributes": {}},
+    )
+    await asyncio.sleep(0.1)
+
+    assert t.state == "unknown"
+    assert t._created_by_us is False
+
+
+# ---------------------------------------------------------------------------
 # Auto-generated names (unnamed ephemeral timers)
 # ---------------------------------------------------------------------------
 

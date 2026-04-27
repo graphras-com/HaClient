@@ -39,6 +39,10 @@ class Timer(Entity):
     finishes.  Persistent timers require an explicit *name*; ephemeral
     timers auto-generate one when no name is provided.
 
+    Timers that already exist in Home Assistant (e.g. created via the UI)
+    are never auto-deleted, regardless of the ``persistent`` flag.  Only
+    helpers created by the library are eligible for auto-cleanup.
+
     In addition to the generic ``on_idle`` listener (which fires for both
     natural expiry and explicit cancellation), the timer provides
     ``on_finished`` and ``on_cancelled`` listeners that fire only for the
@@ -68,6 +72,7 @@ class Timer(Entity):
         self._cancelled_listeners: list[ValueChangeHandler] = []
         self._ensured: bool = False
         self._persistent: bool = persistent
+        self._created_by_us: bool = False
 
     @property
     def persistent(self) -> bool:
@@ -194,9 +199,13 @@ class Timer(Entity):
     ) -> None:
         """Update state, dispatch listeners, then auto-delete if ephemeral.
 
-        For non-persistent timers, the HA helper is deleted when the timer
-        transitions to ``idle``.  The cleanup runs *after* all user listeners
-        have been dispatched so that callbacks see the final state.
+        For non-persistent timers **that were created by the library**, the
+        HA helper is deleted when the timer transitions to ``idle``.  Timers
+        that already existed in Home Assistant (e.g. created via the UI) are
+        never auto-deleted, even when ``persistent`` is ``False``.
+
+        The cleanup runs *after* all user listeners have been dispatched so
+        that callbacks see the final state.
 
         Parameters
         ----------
@@ -210,6 +219,7 @@ class Timer(Entity):
 
         if (
             not self._persistent
+            and self._created_by_us
             and self.state == "idle"
             and old_state_str is not None
             and old_state_str != "idle"
@@ -226,6 +236,7 @@ class Timer(Entity):
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Auto-cleanup of %s failed", self.entity_id, exc_info=True)
         self.state = "unknown"
+        self._created_by_us = False
 
     async def _ensure_exists(self) -> None:
         """Create the timer helper in Home Assistant if it does not exist.
@@ -248,6 +259,7 @@ class Timer(Entity):
             }
         )
         self._ensured = True
+        self._created_by_us = True
 
     async def delete(self) -> None:
         """Delete the timer helper from Home Assistant.
@@ -269,6 +281,7 @@ class Timer(Entity):
             }
         )
         self._ensured = False
+        self._created_by_us = False
 
     # -- Actions --
 
