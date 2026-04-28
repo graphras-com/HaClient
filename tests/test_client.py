@@ -66,8 +66,11 @@ async def test_domain_accessor_reuse(client: HAClient) -> None:
     a = client.media_player("livingroom")
     b = client.media_player("livingroom")
     assert a is b
-    c = client.media_player("media_player.livingroom")
-    assert c is a
+
+
+async def test_domain_accessor_rejects_fully_qualified(client: HAClient) -> None:
+    with pytest.raises(ValueError, match="short object-id"):
+        client.media_player("media_player.livingroom")
 
 
 async def test_domain_accessor_type_conflict(client: HAClient) -> None:

@@ -180,7 +180,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.media_player(name), self._loop_thread)
 
@@ -190,7 +191,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.light(name), self._loop_thread)
 
@@ -200,7 +202,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.switch(name), self._loop_thread)
 
@@ -210,7 +213,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.climate(name), self._loop_thread)
 
@@ -220,7 +224,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.cover(name), self._loop_thread)
 
@@ -230,7 +235,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.sensor(name), self._loop_thread)
 
@@ -240,7 +246,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.binary_sensor(name), self._loop_thread)
 
@@ -250,7 +257,8 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.scene(name), self._loop_thread)
 
@@ -305,6 +313,7 @@ class SyncHAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
         """
         return _SyncProxy(self._client.timer(name), self._loop_thread)

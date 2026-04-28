@@ -9,11 +9,17 @@ from haclient.exceptions import EntityNotFoundError
 from haclient.registry import EntityRegistry
 
 
-def test_resolve_short_and_full_name() -> None:
+def test_resolve_short_name() -> None:
     reg = EntityRegistry()
     assert reg.resolve("light", "kitchen") == "light.kitchen"
-    assert reg.resolve("light", "light.kitchen") == "light.kitchen"
-    assert reg.resolve("light", "switch.hall") == "switch.hall"
+
+
+def test_resolve_rejects_fully_qualified() -> None:
+    reg = EntityRegistry()
+    with pytest.raises(ValueError, match="short object-id"):
+        reg.resolve("light", "light.kitchen")
+    with pytest.raises(ValueError, match="short object-id"):
+        reg.resolve("light", "switch.hall")
 
 
 def test_require_missing() -> None:

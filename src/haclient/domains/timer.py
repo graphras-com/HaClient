@@ -57,6 +57,9 @@ class Timer(Entity):
     ----------
     entity_id : str
         Fully-qualified entity id (e.g. ``"timer.my_timer"``).
+        Users should obtain timers via ``client.timer("my_timer")``
+        which accepts the short object-id and prefixes it
+        automatically.
     client : HAClient
         The owning client instance.
     persistent : bool, optional

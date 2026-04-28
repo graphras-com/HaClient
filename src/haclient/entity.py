@@ -34,10 +34,21 @@ class Entity:
     state known to the client. They are refreshed automatically when the
     client receives ``state_changed`` events for this entity.
 
+    .. note::
+
+        Users should obtain entities via the domain accessors on
+        `HAClient` (e.g. ``client.light("kitchen")``) which accept a
+        **short object-id** and prefix it automatically.  Direct
+        construction of ``Entity`` (or its subclasses) requires a
+        fully-qualified ``entity_id`` because the base class has no
+        domain context of its own.
+
     Parameters
     ----------
     entity_id : str
         Fully-qualified entity id (e.g. ``"light.kitchen"``).
+        When using domain accessors the prefix is added automatically;
+        direct construction must supply the full id.
     client : HAClient
         The owning client instance.
 

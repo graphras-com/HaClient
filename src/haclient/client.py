@@ -268,7 +268,8 @@ class HAClient:
         domain : str
             The Home Assistant domain (e.g. ``"light"``).
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"kitchen"``).  The domain prefix is
+            added automatically; do not pass a fully-qualified entity id.
         cls : type
             The ``Entity`` subclass to instantiate if absent.
 
@@ -299,7 +300,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -316,7 +318,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -333,7 +336,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -350,7 +354,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -367,7 +372,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -384,7 +390,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -401,7 +408,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -418,7 +426,8 @@ class HAClient:
         Parameters
         ----------
         name : str
-            Short object-id or fully-qualified entity id.
+            Short object-id (e.g. ``"livingroom"``).  The domain prefix
+            is added automatically.
 
         Returns
         -------
@@ -506,9 +515,9 @@ class HAClient:
         Parameters
         ----------
         name : str or None, optional
-            Short object-id or fully-qualified entity id.  When ``None``
-            a unique id is generated automatically (only allowed for
-            ephemeral timers).
+            Short object-id (e.g. ``"my_timer"``).  The ``timer.`` prefix
+            is added automatically.  When ``None`` a unique id is
+            generated automatically (only allowed for ephemeral timers).
         persistent : bool, optional
             If ``True``, the HA helper is **not** deleted on idle.
             Requires an explicit *name*.

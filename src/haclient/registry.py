@@ -78,25 +78,33 @@ class EntityRegistry:
         self._entities.clear()
 
     def resolve(self, domain: str, name: str) -> str:
-        """Resolve a short name to a full ``entity_id`` within *domain*.
-
-        *name* may be either the object id (``"livingroom"``) or the
-        fully-qualified ``entity_id`` (``"media_player.livingroom"``).
+        """Build a fully-qualified ``entity_id`` from *domain* and *name*.
 
         Parameters
         ----------
         domain : str
             The Home Assistant domain (e.g. ``"media_player"``).
         name : str
-            The short name or full entity id to resolve.
+            The short object-id (e.g. ``"livingroom"``).  Must **not**
+            contain a dot; pass the short name only, not the
+            fully-qualified entity id.
 
         Returns
         -------
         str
-            The fully-qualified entity id.
+            The fully-qualified entity id (``"{domain}.{name}"``).
+
+        Raises
+        ------
+        ValueError
+            If *name* contains a dot.
         """
         if "." in name:
-            return name
+            hint = name.split(".", 1)[1]
+            raise ValueError(
+                f"Pass the short object-id (e.g. {hint!r}), "
+                f"not the fully-qualified entity id {name!r}"
+            )
         return f"{domain}.{name}"
 
     def in_domain(self, domain: str) -> list[Entity]:
