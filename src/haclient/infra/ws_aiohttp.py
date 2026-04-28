@@ -140,7 +140,21 @@ class AiohttpWebSocketAdapter:
         self._connected.set()
 
     async def close(self) -> None:
-        """Close the WebSocket and stop background tasks."""
+        """Close the WebSocket and stop background tasks.
+
+        Notes
+        -----
+        Side-effects, in order:
+
+        1. Marks the adapter as closing so the reader/keepalive loops
+           exit instead of triggering a reconnect.
+        2. Cancels and awaits the keepalive task.
+        3. Closes the underlying socket and waits up to 5 seconds for
+           the reader task to drain.
+        4. Fails any pending command/pong futures with
+           `ConnectionClosedError`.
+        5. Closes the owned aiohttp session, if any.
+        """
         self._closing = True
         self._connected.clear()
         if self._keepalive_task is not None:

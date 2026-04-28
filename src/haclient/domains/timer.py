@@ -64,6 +64,22 @@ class Timer(Entity):
         store: StateStore,
         clock: Clock,
     ) -> None:
+        """Initialise the timer and its event-driven listener lists.
+
+        Beyond the base `Entity` setup, this also primes the persistence
+        flags used by the auto-cleanup logic in `_handle_state_changed`.
+
+        Parameters
+        ----------
+        entity_id : str
+            Fully-qualified entity id (e.g. ``"timer.cooldown"``).
+        services : ServiceCaller
+            Service-call port used to invoke HA services.
+        store : StateStore
+            State store the entity registers itself with.
+        clock : Clock
+            Scheduler used to dispatch async listeners.
+        """
         super().__init__(entity_id, services, store, clock)
         self._finished_listeners: list[ValueChangeHandler] = []
         self._cancelled_listeners: list[ValueChangeHandler] = []

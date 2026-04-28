@@ -33,7 +33,25 @@ def _now_playing_from_attrs(
     attrs: dict[str, Any],
     base_url: str | None = None,
 ) -> NowPlaying:
-    """Build a `NowPlaying` from a raw HA attributes dict."""
+    """Build a `NowPlaying` from a raw HA attributes dict.
+
+    The HA ``entity_picture`` attribute is a path relative to the HA
+    base URL; this helper resolves it against *base_url* when provided
+    so consumers receive an absolute URL.
+
+    Parameters
+    ----------
+    attrs : dict
+        The entity's ``attributes`` dictionary.
+    base_url : str or None, optional
+        Base URL used to absolutise ``entity_picture``. ``None`` leaves
+        the value untouched.
+
+    Returns
+    -------
+    NowPlaying
+        Frozen snapshot of the playing media.
+    """
     features = attrs.get("supported_features") or 0
     picture = attrs.get("entity_picture")
     if isinstance(picture, str) and base_url and picture.startswith("/"):
@@ -200,6 +218,19 @@ class MediaPlayer(Entity):
         store: StateStore,
         clock: Clock,
     ) -> None:
+        """Initialise the media player and its media-change listener list.
+
+        Parameters
+        ----------
+        entity_id : str
+            Fully-qualified entity id (e.g. ``"media_player.kitchen"``).
+        services : ServiceCaller
+            Service-call port used to invoke HA services.
+        store : StateStore
+            State store the entity registers itself with.
+        clock : Clock
+            Scheduler used to dispatch async listeners.
+        """
         super().__init__(entity_id, services, store, clock)
         self._media_change_listeners: list[ValueChangeHandler] = []
 
@@ -421,6 +452,13 @@ class MediaPlayer(Entity):
         node_count = 0
 
         async def walk(node: dict[str, Any], depth: int, category: str | None) -> None:
+            """Recurse through *node*'s children, collecting playable items.
+
+            Updates *collected*, *seen*, and *node_count* from the
+            enclosing scope. Honours the *max_depth* and *max_nodes*
+            bounds and silently skips children that are missing
+            playback identifiers.
+            """
             nonlocal node_count
             if node_count >= max_nodes:
                 return

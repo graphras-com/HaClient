@@ -217,13 +217,41 @@ class HAClient:
         )
 
     def _select_active_domains(self, requested: list[str] | None) -> list[DomainSpec[Any]]:
-        """Return the specs that should be active for this client."""
+        """Return the specs that should be active for this client.
+
+        Parameters
+        ----------
+        requested : list of str or None
+            Restrict to these domain names, or ``None`` to load every
+            registered domain.
+
+        Returns
+        -------
+        list of DomainSpec
+            Specs in registration order.
+        """
         if requested is None:
             return list(self._registry)
         return self._registry.filter(requested)
 
     def _make_event_router(self, spec: DomainSpec[Any]) -> Callable[[dict[str, Any]], None]:
-        """Build a router that forwards a domain's HA events to its handler."""
+        """Build a router that forwards a domain's HA events to its handler.
+
+        The returned closure looks up the entity by id, then delegates
+        to *spec*'s ``on_event`` callback. Events without a known entity
+        or with no registered handler are silently dropped.
+
+        Parameters
+        ----------
+        spec : DomainSpec
+            The spec whose ``on_event`` callback should receive routed
+            events.
+
+        Returns
+        -------
+        callable
+            Synchronous event handler suitable for `EventBus.subscribe`.
+        """
 
         on_event = spec.on_event
 
@@ -245,6 +273,7 @@ class HAClient:
     # -- Lifecycle ----------------------------------------------------
 
     async def __aenter__(self) -> HAClient:
+        """Enter the async context manager by calling `connect`."""
         await self.connect()
         return self
 
@@ -254,6 +283,7 @@ class HAClient:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        """Exit the async context manager by calling `close`."""
         await self.close()
 
     async def connect(self) -> None:
