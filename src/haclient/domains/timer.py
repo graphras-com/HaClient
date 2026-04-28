@@ -30,18 +30,27 @@ class Timer(Entity):
     Actions use intent-specific names: ``start``, ``pause``, ``cancel``,
     ``finish``, ``change``.
 
-    Timers are **ephemeral by default**: the HA helper is created
-    automatically on the first action and deleted when the timer returns
-    to idle (natural finish or cancellation).  The same ``Timer`` object
-    can be restarted afterwards — the helper is transparently re-created.
+    Obtain a proxy to an **existing** Home Assistant timer via the domain
+    accessor::
 
+        t = client.timer("my_timer")
+
+    To let the library **create and manage** a timer helper, use the async
+    `create` classmethod instead::
+
+        t = await Timer.create(client, name="countdown", duration="00:05:00")
+
+    Timers returned by `create` are **ephemeral by default**: the HA
+    helper is deleted automatically when the timer returns to idle
+    (natural finish or cancellation).  The same ``Timer`` object can be
+    restarted afterwards — the helper is transparently re-created.
     Pass ``persistent=True`` to keep the HA helper alive after the timer
-    finishes.  Persistent timers require an explicit *name*; ephemeral
-    timers auto-generate one when no name is provided.
+    finishes.
 
-    Timers that already exist in Home Assistant (e.g. created via the UI)
-    are never auto-deleted, regardless of the ``persistent`` flag.  Only
-    helpers created by the library are eligible for auto-cleanup.
+    Timers obtained via the domain accessor (``client.timer("name")``)
+    are never auto-deleted, regardless of how they were originally
+    created in Home Assistant.  Only helpers created by `create` are
+    eligible for auto-cleanup.
 
     In addition to the generic ``on_idle`` listener (which fires for both
     natural expiry and explicit cancellation), the timer provides
@@ -62,20 +71,89 @@ class Timer(Entity):
         automatically.
     client : HAClient
         The owning client instance.
-    persistent : bool, optional
-        If ``False`` (default), the HA helper is deleted automatically
-        when the timer returns to idle.
     """
 
     domain = "timer"
 
-    def __init__(self, entity_id: str, client: Any, *, persistent: bool = False) -> None:
+    def __init__(self, entity_id: str, client: Any) -> None:
         super().__init__(entity_id, client)
         self._finished_listeners: list[ValueChangeHandler] = []
         self._cancelled_listeners: list[ValueChangeHandler] = []
         self._ensured: bool = False
-        self._persistent: bool = persistent
+        self._persistent: bool = False
         self._created_by_us: bool = False
+
+    @classmethod
+    async def create(
+        cls,
+        client: Any,
+        *,
+        name: str | None = None,
+        duration: str = "00:01:00",
+        persistent: bool = False,
+    ) -> Timer:
+        """Create a library-managed timer helper in Home Assistant.
+
+        This sends a ``timer/create`` WebSocket command to Home Assistant
+        and returns a ``Timer`` instance that tracks the new helper.
+
+        Ephemeral timers (the default) are automatically deleted when
+        they return to idle.  Pass ``persistent=True`` to keep the HA
+        helper alive.
+
+        Parameters
+        ----------
+        client : HAClient
+            The client instance to use.
+        name : str or None, optional
+            Short object-id (e.g. ``"my_timer"``).  When ``None`` a
+            unique id is generated automatically (only allowed for
+            ephemeral timers).
+        duration : str, optional
+            Initial duration for the helper (e.g. ``"00:05:00"``).
+            Defaults to ``"00:01:00"``.
+        persistent : bool, optional
+            If ``True``, the HA helper is **not** deleted on idle.
+            Requires an explicit *name*.
+
+        Returns
+        -------
+        Timer
+            The newly created timer entity.
+
+        Raises
+        ------
+        ValueError
+            If ``persistent=True`` and *name* is ``None``.
+        """
+        if name is None:
+            if persistent:
+                raise ValueError("Persistent timers require an explicit name")
+            name = _generate_timer_id()
+
+        entity_id = client.registry.resolve("timer", name)
+        existing = client.registry.get(entity_id)
+        timer: Timer
+        if existing is not None and isinstance(existing, cls):
+            timer = existing
+            if timer._ensured:
+                return timer
+        else:
+            timer = cls(entity_id, client)
+
+        timer._persistent = persistent  # noqa: SLF001
+
+        object_id = entity_id.split(".", 1)[1]
+        await client.ws.send_command(
+            {
+                "type": "timer/create",
+                "name": object_id,
+                "duration": duration,
+            }
+        )
+        timer._ensured = True  # noqa: SLF001
+        timer._created_by_us = True  # noqa: SLF001
+        return timer
 
     @property
     def persistent(self) -> bool:
@@ -241,29 +319,6 @@ class Timer(Entity):
         self.state = "unknown"
         self._created_by_us = False
 
-    async def _ensure_exists(self) -> None:
-        """Create the timer helper in Home Assistant if it does not exist.
-
-        Uses the ``timer/create`` WebSocket command.  The call is idempotent:
-        once the helper has been confirmed (either via the initial state fetch
-        or a prior ``_ensure_exists`` call), subsequent invocations are no-ops.
-
-        The object-id is extracted from the ``entity_id`` (the part after
-        ``timer.``).
-        """
-        if self._ensured or self.state != "unknown":
-            return
-        object_id = self.entity_id.split(".", 1)[1]
-        await self._client.ws.send_command(
-            {
-                "type": "timer/create",
-                "name": object_id,
-                "duration": "00:01:00",
-            }
-        )
-        self._ensured = True
-        self._created_by_us = True
-
     async def delete(self) -> None:
         """Delete the timer helper from Home Assistant.
 
@@ -296,23 +351,19 @@ class Timer(Entity):
         duration : str or None, optional
             Override duration (e.g. ``"00:05:00"``).
         """
-        await self._ensure_exists()
         data: dict[str, Any] | None = {"duration": duration} if duration else None
         await self._call_service("start", data)
 
     async def pause(self) -> None:
         """Pause the timer."""
-        await self._ensure_exists()
         await self._call_service("pause")
 
     async def cancel(self) -> None:
         """Cancel the timer (returns to idle)."""
-        await self._ensure_exists()
         await self._call_service("cancel")
 
     async def finish(self) -> None:
         """Finish the timer immediately."""
-        await self._ensure_exists()
         await self._call_service("finish")
 
     async def change(self, *, duration: str) -> None:
@@ -323,7 +374,6 @@ class Timer(Entity):
         duration : str
             Duration to add/subtract (e.g. ``"00:01:00"`` or ``"-00:00:30"``).
         """
-        await self._ensure_exists()
         await self._call_service("change", {"duration": duration})
 
     # -- Listener decorators --

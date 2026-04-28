@@ -569,48 +569,24 @@ class HAClient:
             data["transition"] = transition
         await self._call_service("scene", "apply", data)
 
-    def timer(self, name: str | None = None, *, persistent: bool = False) -> Timer:
-        """Return a `Timer`, creating the Python object if needed.
+    def timer(self, name: str) -> Timer:
+        """Return the `Timer` for *name*, creating the Python proxy if needed.
 
-        Timers are **ephemeral by default**: the HA helper is created on the
-        first action and deleted automatically when the timer returns to idle.
-        Pass ``persistent=True`` to keep the helper alive.
+        This returns a proxy to an **existing** Home Assistant timer.
+        To create a library-managed ephemeral timer, use
+        ``await Timer.create(client, ...)`` instead.
 
         Parameters
         ----------
-        name : str or None, optional
+        name : str
             Short object-id (e.g. ``"my_timer"``).  The ``timer.`` prefix
-            is added automatically.  When ``None`` a unique id is
-            generated automatically (only allowed for ephemeral timers).
-        persistent : bool, optional
-            If ``True``, the HA helper is **not** deleted on idle.
-            Requires an explicit *name*.
+            is added automatically.
 
         Returns
         -------
         Timer
             The timer entity.
-
-        Raises
-        ------
-        ValueError
-            If ``persistent=True`` and *name* is ``None``.
         """
         from .domains.timer import Timer as _Timer
-        from .domains.timer import _generate_timer_id
 
-        if name is None:
-            if persistent:
-                raise ValueError("Persistent timers require an explicit name")
-            name = _generate_timer_id()
-
-        entity_id = self.registry.resolve("timer", name)
-        existing = self.registry.get(entity_id)
-        if existing is not None:
-            if not isinstance(existing, _Timer):
-                raise HAClientError(
-                    f"Entity {entity_id} is registered as {type(existing).__name__}, "
-                    f"not {_Timer.__name__}"
-                )
-            return existing
-        return _Timer(entity_id, self, persistent=persistent)
+        return self._get_or_create("timer", name, _Timer)
