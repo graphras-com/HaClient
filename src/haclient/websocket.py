@@ -90,6 +90,7 @@ class WebSocketClient:
         self._closing = False
         self._connected = asyncio.Event()
         self._disconnect_listeners: list[Callable[[], Awaitable[None] | None]] = []
+        self._reconnect_listeners: list[Callable[[], Awaitable[None] | None]] = []
 
     @property
     def connected(self) -> bool:
@@ -186,6 +187,28 @@ class WebSocketClient:
             The same *handler*, for use as a decorator.
         """
         self._disconnect_listeners.append(handler)
+        return handler
+
+    def on_reconnect(
+        self, handler: Callable[[], Awaitable[None] | None]
+    ) -> Callable[[], Awaitable[None] | None]:
+        """Register *handler* to be called after a successful reconnection.
+
+        The handler fires once the WebSocket is authenticated and all prior
+        event subscriptions have been re-established. This is the right
+        place to refresh stale state (e.g. call ``refresh_all``).
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
+        self._reconnect_listeners.append(handler)
         return handler
 
     def _next_id(self) -> int:
@@ -369,6 +392,16 @@ class WebSocketClient:
             except Exception:  # pragma: no cover - defensive
                 _LOGGER.exception("Disconnect listener raised")
 
+    async def _notify_reconnect(self) -> None:
+        """Invoke all registered reconnect listeners."""
+        for listener in list(self._reconnect_listeners):
+            try:
+                result = listener()
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception:  # pragma: no cover - defensive
+                _LOGGER.exception("Reconnect listener raised")
+
     async def _dispatch(self, msg: dict[str, Any]) -> None:
         """Route an incoming message to the appropriate handler or future."""
         mtype = msg.get("type")
@@ -436,6 +469,7 @@ class WebSocketClient:
                     await self.subscribe_events(handler, event_type)
                 except Exception as err:  # noqa: BLE001
                     _LOGGER.warning("Failed to resubscribe to %s: %s", event_type, err)
+            await self._notify_reconnect()
             return
 
     async def ping(self, *, timeout: float | None = None) -> None:

@@ -165,6 +165,7 @@ class HAClient:
         self._timer_cancelled_sub_id = await self.ws.subscribe_events(
             self._on_timer_event, "timer.cancelled"
         )
+        self.ws.on_reconnect(self._on_reconnect)
         self._connected = True
 
     async def close(self) -> None:
@@ -211,6 +212,18 @@ class HAClient:
         if entity is None or not isinstance(entity, _Timer):
             return
         entity._handle_timer_event(event_type, data)  # noqa: SLF001
+
+    async def _on_reconnect(self) -> None:
+        """Refresh all entity state after the WebSocket reconnects.
+
+        This is registered as a reconnect listener so that entities whose
+        state changed while the connection was down are brought up to date
+        automatically.
+        """
+        try:
+            await self.refresh_all()
+        except HAClientError as err:
+            _LOGGER.warning("Post-reconnect refresh failed: %s", err)
 
     async def _call_service(
         self,

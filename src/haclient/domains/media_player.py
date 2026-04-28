@@ -23,13 +23,19 @@ _MAX_BROWSE_NODES = 2000
 _MAX_BROWSE_DEPTH = 6
 
 
-def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
+def _now_playing_from_attrs(
+    attrs: dict[str, Any],
+    base_url: str | None = None,
+) -> NowPlaying:
     """Build a `NowPlaying` from a raw HA attributes dict.
 
     Parameters
     ----------
     attrs : dict
         Raw attributes dictionary from Home Assistant.
+    base_url : str or None, optional
+        The Home Assistant base URL. When provided, a relative
+        ``entity_picture`` path is resolved to an absolute URL.
 
     Returns
     -------
@@ -37,6 +43,9 @@ def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
         A structured snapshot of the currently playing media.
     """
     features = attrs.get("supported_features") or 0
+    picture = attrs.get("entity_picture")
+    if isinstance(picture, str) and base_url and picture.startswith("/"):
+        picture = base_url.rstrip("/") + picture
     return NowPlaying(
         source=attrs.get("source"),
         title=attrs.get("media_title"),
@@ -46,7 +55,7 @@ def _now_playing_from_attrs(attrs: dict[str, Any]) -> NowPlaying:
         content_type=attrs.get("media_content_type"),
         content_id=attrs.get("media_content_id"),
         duration=attrs.get("media_duration"),
-        entity_picture=attrs.get("entity_picture"),
+        entity_picture=picture,
         queue_position=attrs.get("queue_position"),
         queue_size=attrs.get("queue_size"),
         playlist=attrs.get("media_playlist"),
@@ -87,7 +96,9 @@ class NowPlaying:
     duration : int or None
         Media duration in seconds.
     entity_picture : str or None
-        URL of the entity picture / album art.
+        Absolute URL of the entity picture / album art. Relative paths
+        returned by Home Assistant are resolved against the client's
+        base URL automatically.
     queue_position : int or None
         Current position in the play queue.
     queue_size : int or None
@@ -322,8 +333,9 @@ class MediaPlayer(Entity):
         super()._dispatch_granular_events(old_state, new_state)
         old_attrs = (old_state or {}).get("attributes") or {}
         new_attrs = (new_state or {}).get("attributes") or {}
-        old_np = _now_playing_from_attrs(old_attrs)
-        new_np = _now_playing_from_attrs(new_attrs)
+        base = self._client.base_url
+        old_np = _now_playing_from_attrs(old_attrs, base)
+        new_np = _now_playing_from_attrs(new_attrs, base)
         if old_np != new_np:
             for listener in list(self._media_change_listeners):
                 self._schedule_value(listener, old_np, new_np)
@@ -397,7 +409,7 @@ class MediaPlayer(Entity):
         NowPlaying
             The current playback metadata.
         """
-        return _now_playing_from_attrs(self.attributes)
+        return _now_playing_from_attrs(self.attributes, self._client.base_url)
 
     # -- Actions --
 

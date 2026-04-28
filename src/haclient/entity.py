@@ -270,17 +270,31 @@ class Entity:
             self._state_value_listeners.remove(func)
 
     def on_state_change(self, func: F) -> F:
-        """Register *func* as a listener for state changes on this entity.
+        """Register *func* as a listener for **raw** state changes on this entity.
 
         May be used as a decorator. The callback receives the previous and new
-        raw state objects (``dict`` or ``None``). Coroutine functions are fully
-        supported and will be scheduled on the client's event loop without
-        blocking the dispatcher.
+        **full state dictionaries** as returned by Home Assistant (or ``None``
+        when the entity is created/removed). Each dict contains keys like
+        ``"state"``, ``"attributes"``, ``"last_changed"``, etc.
+
+        .. tip::
+
+            If you only need the state *string* (e.g. ``"on"`` / ``"off"`` or
+            ``"22.5"``), use the domain-specific convenience listener instead.
+            For example, :meth:`Sensor.on_value_change
+            <haclient.domains.sensor.Sensor.on_value_change>` passes
+            ``(old_state_str, new_state_str)`` directly, avoiding the need to
+            extract ``state["state"]`` yourself.
+
+        Coroutine functions are fully supported and will be scheduled on the
+        client's event loop without blocking the dispatcher.
 
         Parameters
         ----------
         func : callable
-            Callback with signature ``(old_state, new_state)``.
+            Callback with signature ``(old_state: dict | None, new_state: dict | None)``.
+            Each argument is the **full** HA state object, not just the state
+            string.
 
         Returns
         -------

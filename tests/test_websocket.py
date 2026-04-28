@@ -565,3 +565,43 @@ async def test_close_cancels_pong_waiters(fake_ha: FakeHA) -> None:
     await asyncio.sleep(0.1)
     await ws.close()
     await task
+
+
+async def test_reconnect_listener(fake_ha: FakeHA) -> None:
+    """on_reconnect handler fires after a successful reconnect."""
+    ws = await _make_ws(fake_ha, reconnect=True)
+    called = asyncio.Event()
+
+    @ws.on_reconnect
+    async def on_reconnect() -> None:
+        called.set()
+
+    try:
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        await asyncio.wait_for(called.wait(), timeout=5)
+    finally:
+        await ws.close()
+
+
+async def test_reconnect_listener_sync(fake_ha: FakeHA) -> None:
+    """Sync on_reconnect handler also works."""
+    ws = await _make_ws(fake_ha, reconnect=True)
+    flag = _Flag()
+
+    @ws.on_reconnect
+    def on_reconnect() -> None:
+        flag.set()
+
+    try:
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if flag.is_set():
+                break
+        assert flag.is_set()
+    finally:
+        await ws.close()

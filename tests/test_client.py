@@ -118,6 +118,42 @@ async def test_call_service_via_rest_fallback(fake_ha: FakeHA) -> None:
     assert fake_ha.rest_service_calls == [("switch", "toggle", {"entity_id": "switch.x"})]
 
 
+async def test_reconnect_triggers_refresh_all(fake_ha: FakeHA) -> None:
+    """After reconnect, HAClient automatically calls refresh_all."""
+    fake_ha.states = [
+        {"entity_id": "light.kitchen", "state": "off", "attributes": {}},
+    ]
+    ha = HAClient(
+        fake_ha.base_url,
+        fake_ha.token,
+        ping_interval=0,
+        request_timeout=5.0,
+    )
+    light = ha.light("kitchen")
+    await ha.connect()
+    try:
+        assert light.state == "off"
+
+        # Update server state while we're about to disconnect
+        fake_ha.states = [
+            {"entity_id": "light.kitchen", "state": "on", "attributes": {"brightness": 200}},
+        ]
+
+        # Force disconnect
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        # Wait for reconnect + auto-refresh
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if light.state == "on":
+                break
+        assert light.state == "on"
+        assert light.brightness == 200
+    finally:
+        await ha.close()
+
+
 async def test_create_scene(fake_ha: FakeHA) -> None:
     ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0)
     try:

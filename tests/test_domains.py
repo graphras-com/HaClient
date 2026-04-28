@@ -309,6 +309,56 @@ async def test_media_player_state_props() -> None:
         await ha.close()
 
 
+async def test_now_playing_entity_picture_absolute_url() -> None:
+    """entity_picture is resolved to an absolute URL using the client base_url."""
+    ha = HAClient("http://ha.local:8123", "t")
+    try:
+        mp = ha.media_player("livingroom")
+        mp._apply_state(
+            {
+                "state": "playing",
+                "attributes": {
+                    "entity_picture": "/api/media_player_proxy/media_player.livingroom",
+                },
+            }
+        )
+        assert (
+            mp.now_playing.entity_picture
+            == "http://ha.local:8123/api/media_player_proxy/media_player.livingroom"
+        )
+    finally:
+        await ha.close()
+
+
+async def test_now_playing_entity_picture_already_absolute() -> None:
+    """entity_picture that is already absolute is left unchanged."""
+    ha = HAClient("http://ha.local:8123", "t")
+    try:
+        mp = ha.media_player("livingroom")
+        mp._apply_state(
+            {
+                "state": "playing",
+                "attributes": {
+                    "entity_picture": "https://cdn.example.com/art.jpg",
+                },
+            }
+        )
+        assert mp.now_playing.entity_picture == "https://cdn.example.com/art.jpg"
+    finally:
+        await ha.close()
+
+
+async def test_now_playing_entity_picture_none() -> None:
+    """entity_picture is None when not present."""
+    ha = HAClient("http://ha.local:8123", "t")
+    try:
+        mp = ha.media_player("livingroom")
+        mp._apply_state({"state": "playing", "attributes": {}})
+        assert mp.now_playing.entity_picture is None
+    finally:
+        await ha.close()
+
+
 async def test_entity_refresh_via_rest(client: HAClient, fake_ha: FakeHA) -> None:
     fake_ha.states = [
         {"entity_id": "light.kitchen", "state": "on", "attributes": {"brightness": 77}}

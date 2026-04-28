@@ -22,10 +22,21 @@ class Sensor(Entity):
     def on_value_change(self, func: Any) -> Any:
         """Register a listener for sensor value changes.
 
+        The callback receives the **state strings** directly (e.g.
+        ``"21.5"``, ``"22.0"``) — not the full HA state dictionaries.
+        This fires whenever the state string changes between events.
+
+        Use this instead of :meth:`~haclient.entity.Entity.on_state_change`
+        when you only care about the sensor's value and not the full state
+        object (attributes, timestamps, etc.).
+
         Parameters
         ----------
         func : callable
-            Callback with signature ``(old_state, new_state)``.
+            Callback with signature ``(old_state_str: str | None,
+            new_state_str: str | None)``. Both arguments are raw state
+            strings (e.g. ``"22.5"``, ``"on"``), or ``None`` if the
+            previous/new state is absent.
 
         Returns
         -------
