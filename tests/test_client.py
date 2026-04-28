@@ -283,3 +283,42 @@ async def test_initial_state_fetch_failure_is_logged(fake_ha: FakeHA, caplog: An
         await ha.connect()
     finally:
         await ha.close()
+
+
+async def test_on_reconnect_proxy(fake_ha: FakeHA) -> None:
+    """on_reconnect registered via HAClient fires after reconnection."""
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0, reconnect=True)
+    called = asyncio.Event()
+
+    @ha.on_reconnect
+    async def _reconnected() -> None:
+        called.set()
+
+    try:
+        await ha.connect()
+        # Force-close all server-side connections to trigger a reconnect.
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        await asyncio.wait_for(called.wait(), timeout=5)
+    finally:
+        await ha.close()
+
+
+async def test_on_disconnect_proxy(fake_ha: FakeHA) -> None:
+    """on_disconnect registered via HAClient fires when connection drops."""
+    ha = HAClient(fake_ha.base_url, fake_ha.token, ping_interval=0, reconnect=False)
+    called = asyncio.Event()
+
+    @ha.on_disconnect
+    async def _disconnected() -> None:
+        called.set()
+
+    try:
+        await ha.connect()
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        await asyncio.wait_for(called.wait(), timeout=5)
+    finally:
+        await ha.close()

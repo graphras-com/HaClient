@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
 from .client import HAClient
@@ -171,6 +171,40 @@ class SyncHAClient:
     def refresh_all(self) -> None:
         """Refresh all registered entities synchronously."""
         self._loop_thread.submit(self._client.refresh_all())
+
+    def on_reconnect(
+        self, handler: Callable[[], Awaitable[None] | None]
+    ) -> Callable[[], Awaitable[None] | None]:
+        """Register *handler* to be called after a successful reconnection.
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
+        return self._client.on_reconnect(handler)
+
+    def on_disconnect(
+        self, handler: Callable[[], Awaitable[None] | None]
+    ) -> Callable[[], Awaitable[None] | None]:
+        """Register *handler* to be called when the connection drops.
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
+        return self._client.on_disconnect(handler)
 
     # -- Domain accessors --
 

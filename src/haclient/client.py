@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, TypeVar
 from urllib.parse import urlparse, urlunparse
@@ -173,6 +174,56 @@ class HAClient:
         self._connected = False
         await self.ws.close()
         await self.rest.close()
+
+    def on_reconnect(
+        self, handler: Callable[[], Awaitable[None] | None]
+    ) -> Callable[[], Awaitable[None] | None]:
+        """Register *handler* to be called after a successful reconnection.
+
+        The handler fires once the WebSocket is re-authenticated and all prior
+        event subscriptions have been re-established. Use this to refresh
+        application state that may have gone stale while disconnected.
+
+        Can be used as a decorator::
+
+            @ha.on_reconnect
+            async def refreshed():
+                print("Reconnected!")
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
+        return self.ws.on_reconnect(handler)
+
+    def on_disconnect(
+        self, handler: Callable[[], Awaitable[None] | None]
+    ) -> Callable[[], Awaitable[None] | None]:
+        """Register *handler* to be called when the connection drops.
+
+        Can be used as a decorator::
+
+            @ha.on_disconnect
+            async def lost():
+                print("Disconnected!")
+
+        Parameters
+        ----------
+        handler : callable
+            A sync or async callable taking no arguments.
+
+        Returns
+        -------
+        callable
+            The same *handler*, for use as a decorator.
+        """
+        return self.ws.on_disconnect(handler)
 
     def _on_state_changed_event(self, event: dict[str, Any]) -> None:
         """Dispatch a ``state_changed`` event to the appropriate entity.
