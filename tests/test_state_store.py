@@ -10,54 +10,79 @@ from haclient.exceptions import HAClientError
 
 
 class _Rest:
+    """`RestPort` stub used to drive `StateStore` priming edge cases."""
+
     base_url = "http://x"
 
     def __init__(self, *, raise_on_get_states: bool = False, states: list[Any] | None = None):
+        """Configure the stub.
+
+        Parameters
+        ----------
+        raise_on_get_states : bool, optional
+            When ``True``, every `get_states` call raises `HAClientError`.
+        states : list or None, optional
+            States returned by `get_states` (when not raising).
+        """
         self._raise = raise_on_get_states
         self._states = states or []
         self.calls = 0
 
     async def get_states(self) -> list[dict[str, Any]]:
+        """Return the configured states or raise as configured."""
         self.calls += 1
         if self._raise:
             raise HAClientError("boom")
         return list(self._states)
 
     async def get_state(self, entity_id: str) -> dict[str, Any] | None:
+        """Stub: return ``None`` for every entity."""
         return None
 
     async def call_service(
         self, domain: str, service: str, data: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
+        """Stub: return an empty state list."""
         return []
 
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        """Stub: no resources to release."""
 
 
 class _WS:
+    """`WebSocketPort` stub that captures the registered event handlers."""
+
     connected = True
 
     def __init__(self) -> None:
+        """Initialise the per-event-type handler map."""
         self.handlers: dict[str, Any] = {}
 
-    async def connect(self) -> None: ...
+    async def connect(self) -> None:
+        """Stub: no-op connect."""
 
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        """Stub: no-op close."""
 
     async def send_command(self, payload: dict[str, Any], *, timeout: float | None = None) -> Any:
+        """Stub: ignore commands and return ``None``."""
         return None
 
     async def subscribe_events(self, handler: Any, event_type: str | None = None) -> int:
+        """Record the handler keyed by *event_type* and return id ``1``."""
         if event_type is not None:
             self.handlers[event_type] = handler
         return 1
 
-    async def unsubscribe(self, subscription_id: int) -> None: ...
+    async def unsubscribe(self, subscription_id: int) -> None:
+        """Stub: no-op unsubscribe."""
 
     def on_disconnect(self, handler: Any) -> Any:
+        """Stub: return *handler* unchanged."""
         return handler
 
     def on_reconnect(self, handler: Any) -> Any:
+        """Stub: return *handler* unchanged."""
         return handler
 
 

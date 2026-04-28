@@ -13,6 +13,26 @@ from .fake_ha import FakeHA
 
 
 def _find_call(fake_ha: FakeHA, service: str) -> dict[str, Any]:
+    """Return the first WS ``call_service`` payload for *service*.
+
+    Parameters
+    ----------
+    fake_ha : FakeHA
+        The fake server whose `ws_service_calls` log to search.
+    service : str
+        The service name to match (e.g. ``"turn_on"``).
+
+    Returns
+    -------
+    dict
+        The recorded payload.
+
+    Raises
+    ------
+    AssertionError
+        If no matching call is found, so that test failures point at
+        the missing service rather than indexing on an empty result.
+    """
     for call in fake_ha.ws_service_calls:
         if call["service"] == service:
             return call

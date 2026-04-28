@@ -14,7 +14,15 @@ from .fake_ha import FakeHA
 
 @pytest_asyncio.fixture
 async def fake_ha() -> AsyncIterator[FakeHA]:
-    """Start a `FakeHA` server and tear it down after the test."""
+    """Start a `FakeHA` server and tear it down after the test.
+
+    Yields
+    ------
+    FakeHA
+        A running in-process server bound to a free local port. Tests
+        may register custom command handlers via ``server.handlers`` or
+        push events with ``server.push_event``.
+    """
     server = FakeHA()
     await server.start()
     try:
@@ -25,7 +33,19 @@ async def fake_ha() -> AsyncIterator[FakeHA]:
 
 @pytest_asyncio.fixture
 async def client(fake_ha: FakeHA) -> AsyncIterator[HAClient]:
-    """Return a connected `HAClient` talking to the fake server."""
+    """Return a connected `HAClient` talking to the fake server.
+
+    Parameters
+    ----------
+    fake_ha : FakeHA
+        Active fake server provided by the `fake_ha` fixture.
+
+    Yields
+    ------
+    HAClient
+        Connected client. ``ping_interval`` is disabled and the request
+        timeout is shortened to keep the test suite snappy.
+    """
     ha = HAClient.from_url(
         fake_ha.base_url,
         token=fake_ha.token,
@@ -41,4 +61,11 @@ async def client(fake_ha: FakeHA) -> AsyncIterator[HAClient]:
 
 @pytest.fixture
 def anyio_backend() -> str:
+    """Force the ``anyio`` plugin to run on the asyncio backend.
+
+    Returns
+    -------
+    str
+        The backend identifier consumed by ``pytest-anyio``.
+    """
     return "asyncio"

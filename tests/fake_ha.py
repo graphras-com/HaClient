@@ -22,7 +22,43 @@ CommandHandler = Callable[["FakeHA", web.WebSocketResponse, dict[str, Any]], Awa
 
 
 class FakeHA:
-    """Run an aiohttp server exposing a subset of the HA HTTP + WS API."""
+    """Run an aiohttp server exposing a subset of the HA HTTP + WS API.
+
+    The server binds to ``127.0.0.1`` on a free OS-assigned port. Tests
+    interact with it as a black box via `base_url` / `ws_url` and may
+    customise behaviour by mutating the public attributes below.
+
+    Attributes
+    ----------
+    token : str
+        Bearer token accepted on REST requests and the WS auth
+        handshake.
+    require_auth : bool
+        When ``False``, REST endpoints skip the token check.
+    states : list of dict
+        State dicts returned by ``GET /api/states`` and
+        ``GET /api/states/<entity_id>``. Tests may mutate this list at
+        any time.
+    handlers : dict
+        Optional per-command-type overrides. When set, the handler is
+        invoked instead of the built-in dispatch logic.
+    rest_service_calls : list of tuple
+        Recorded ``(domain, service, payload)`` triples for every
+        ``POST /api/services/...`` call.
+    ws_service_calls : list of dict
+        Recorded payloads for every ``call_service`` WS command.
+    subscriptions : dict
+        Map of event type to subscription ids per current connection.
+    reject_auth : bool
+        When ``True``, the WS auth handshake responds with
+        ``auth_invalid`` regardless of the supplied token.
+    drop_on_command : str or None
+        When set, the WS connection is closed without responding the
+        first time a command of this ``type`` arrives. Useful to
+        simulate mid-flight disconnects.
+    port : int
+        Bound TCP port (set by `start`).
+    """
 
     def __init__(
         self,
@@ -31,6 +67,18 @@ class FakeHA:
         require_auth: bool = True,
         states: list[dict[str, Any]] | None = None,
     ) -> None:
+        """Initialise the fake server.
+
+        Parameters
+        ----------
+        token : str, optional
+            Bearer token accepted by the server.
+        require_auth : bool, optional
+            When ``False``, REST endpoints skip the token check.
+        states : list of dict or None, optional
+            Initial state objects returned by the ``/api/states``
+            endpoints.
+        """
         self.token = token
         self.require_auth = require_auth
         self.states: list[dict[str, Any]] = states or []
@@ -56,6 +104,13 @@ class FakeHA:
         self.drop_on_command: str | None = None
 
     async def start(self) -> str:
+        """Bind to a free port and start serving.
+
+        Returns
+        -------
+        str
+            The base URL (``http://127.0.0.1:<port>``).
+        """
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, "127.0.0.1", 0)
@@ -66,6 +121,7 @@ class FakeHA:
         return f"http://127.0.0.1:{self.port}"
 
     async def stop(self) -> None:
+        """Close all open WS connections and shut down the HTTP runner."""
         for ws in list(self.connections):
             if not ws.closed:
                 await ws.close()
@@ -76,13 +132,23 @@ class FakeHA:
 
     @property
     def base_url(self) -> str:
+        """Return the bound HTTP base URL."""
         return f"http://127.0.0.1:{self.port}"
 
     @property
     def ws_url(self) -> str:
+        """Return the bound WebSocket URL."""
         return f"ws://127.0.0.1:{self.port}/api/websocket"
 
     def _check_token(self, request: web.Request) -> web.Response | None:
+        """Validate the bearer token on a REST request.
+
+        Returns
+        -------
+        web.Response or None
+            A 401 response when the token is missing or wrong; ``None``
+            when the request is authorised (or auth is disabled).
+        """
         if not self.require_auth:
             return None
         header = request.headers.get("Authorization", "")
@@ -91,18 +157,24 @@ class FakeHA:
         return None
 
     async def _handle_ping(self, request: web.Request) -> web.Response:
+        """Handle ``GET /api/`` (the HA reachability probe)."""
         denial = self._check_token(request)
         if denial is not None:
             return denial
         return web.json_response({"message": "API running."})
 
     async def _handle_states(self, request: web.Request) -> web.Response:
+        """Handle ``GET /api/states`` by returning every known state."""
         denial = self._check_token(request)
         if denial is not None:
             return denial
         return web.json_response(self.states)
 
     async def _handle_state(self, request: web.Request) -> web.Response:
+        """Handle ``GET /api/states/<entity_id>``.
+
+        Returns 404 when the entity is not in `states`.
+        """
         denial = self._check_token(request)
         if denial is not None:
             return denial
@@ -113,6 +185,11 @@ class FakeHA:
         return web.Response(status=404, text="not found")
 
     async def _handle_service(self, request: web.Request) -> web.Response:
+        """Handle ``POST /api/services/<domain>/<service>``.
+
+        Records the call into `rest_service_calls` and returns an empty
+        list, matching HA's "no states changed" response shape.
+        """
         denial = self._check_token(request)
         if denial is not None:
             return denial
@@ -126,6 +203,12 @@ class FakeHA:
         return web.json_response([])
 
     async def _handle_ws(self, request: web.Request) -> web.WebSocketResponse:
+        """Drive the full WebSocket lifecycle for a single connection.
+
+        Performs the HA auth handshake (``auth_required`` →
+        ``auth_invalid``/``auth_ok``) and then dispatches every
+        subsequent text frame through `_dispatch` until the peer closes.
+        """
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self.connections.append(ws)
@@ -153,6 +236,27 @@ class FakeHA:
         return ws
 
     async def _dispatch(self, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
+        """Route an incoming WS command to the appropriate handler.
+
+        Resolution order:
+
+        1. If `drop_on_command` matches, close the socket and return.
+        2. If a per-type handler is registered in `handlers`, invoke it.
+        3. Otherwise, fall through to the built-in handlers for the
+           commands actually exercised by the test suite (``ping``,
+           ``subscribe_events``, ``unsubscribe_events``, ``call_service``,
+           ``media_player/browse_media``, ``timer/create``,
+           ``timer/delete``).
+        4. Unknown command types receive an ``unknown_command`` error
+           response.
+
+        Parameters
+        ----------
+        ws : web.WebSocketResponse
+            The connection to reply on.
+        msg : dict
+            The decoded command frame.
+        """
         mtype = msg.get("type", "")
         mid = msg.get("id")
 

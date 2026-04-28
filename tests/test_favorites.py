@@ -12,7 +12,15 @@ from .fake_ha import FakeHA
 
 
 def _make_tree() -> dict[str, Any]:
-    """Return a multi-level browse_media root used by the browse handler."""
+    """Return a multi-level browse_media root used by the browse handler.
+
+    Returns
+    -------
+    dict
+        A synthetic root browse node containing an expandable
+        ``Favorites`` directory and two playable tracks (one
+        intentionally duplicated to exercise dedup).
+    """
     return {
         "title": "root",
         "media_content_id": "root",
@@ -46,6 +54,12 @@ def _make_tree() -> dict[str, Any]:
 
 
 def _make_subtree() -> dict[str, Any]:
+    """Return the ``Favorites`` subtree returned for ``media_content_id="favs"``.
+
+    Includes a malformed entry (missing ``media_content_id``) and a raw
+    string in ``children`` to exercise robustness of the favorites
+    walker.
+    """
     return {
         "title": "Favorites",
         "media_content_id": "favs",
@@ -72,6 +86,7 @@ def _make_subtree() -> dict[str, Any]:
 
 
 def _make_playlist_a() -> dict[str, Any]:
+    """Return the ``Playlist A`` subtree containing two playable tracks."""
     return {
         "title": "Playlist A",
         "media_content_id": "playlist://a",
@@ -98,6 +113,22 @@ def _make_playlist_a() -> dict[str, Any]:
 
 
 async def _browse_handler(server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]) -> None:
+    """`FakeHA` handler that serves the staged ``browse_media`` tree.
+
+    Routes ``media_content_id`` to one of the ``_make_*`` builders and
+    replies with a ``success=True`` result frame. Unknown ids return an
+    empty ``children`` list to keep the recursion bounded.
+
+    Parameters
+    ----------
+    server : FakeHA
+        Server hosting the WebSocket; unused but required by the
+        `CommandHandler` signature.
+    ws : web.WebSocketResponse
+        Connection on which to send the reply.
+    msg : dict
+        The decoded ``media_player/browse_media`` command.
+    """
     content_id = msg.get("media_content_id")
     if content_id is None:
         result = _make_tree()
@@ -245,6 +276,7 @@ def _make_sonos_root() -> dict[str, Any]:
 
 
 def _make_sonos_radio() -> dict[str, Any]:
+    """Return the ``Radio`` subtree of the synthetic Sonos favorites."""
     return {
         "title": "Radio",
         "media_class": "directory",
@@ -275,6 +307,7 @@ def _make_sonos_radio() -> dict[str, Any]:
 
 
 def _make_sonos_albums() -> dict[str, Any]:
+    """Return the ``Albums`` subtree of the synthetic Sonos favorites."""
     return {
         "title": "Albums",
         "media_class": "directory",
@@ -296,6 +329,7 @@ def _make_sonos_albums() -> dict[str, Any]:
 
 
 def _make_sonos_playlists() -> dict[str, Any]:
+    """Return the ``Playlists`` subtree of the synthetic Sonos favorites."""
     return {
         "title": "Playlists",
         "media_class": "directory",
@@ -319,6 +353,20 @@ def _make_sonos_playlists() -> dict[str, Any]:
 async def _sonos_browse_handler(
     server: FakeHA, ws: web.WebSocketResponse, msg: dict[str, Any]
 ) -> None:
+    """`FakeHA` handler that serves the synthetic Sonos favorites tree.
+
+    Parameters
+    ----------
+    server : FakeHA
+        Server hosting the WebSocket; unused but required by the
+        `CommandHandler` signature.
+    ws : web.WebSocketResponse
+        Connection on which to send the reply.
+    msg : dict
+        The decoded ``media_player/browse_media`` command. The
+        ``media_content_id`` selects which subtree builder is invoked;
+        unknown ids resolve to an empty ``children`` list.
+    """
     content_id = msg.get("media_content_id")
     if content_id is None or content_id == "":
         result = _make_sonos_root()

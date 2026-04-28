@@ -15,12 +15,35 @@ from .fake_ha import FakeHA
 
 @pytest_asyncio.fixture
 async def running_fake_ha() -> FakeHA:
-    """A fake HA started by pytest-asyncio; used from a background thread."""
+    """Placeholder for an unused fixture.
+
+    Kept so that legacy ``running_fake_ha`` references in this file fail
+    loudly with a clear error rather than silently using a stale server.
+    Tests should depend on the standard ``fake_ha`` fixture from
+    `tests.conftest` instead.
+
+    Raises
+    ------
+    RuntimeError
+        Always — this fixture must not be used.
+    """
     raise RuntimeError("Use fake_ha fixture instead")
 
 
 def _run_sync_in_thread(fake_ha: FakeHA) -> dict[str, object]:
-    """Exercise SyncHAClient in a plain thread (no asyncio loop)."""
+    """Exercise `SyncHAClient` in a plain thread (no asyncio loop).
+
+    Parameters
+    ----------
+    fake_ha : FakeHA
+        Active fake server reachable from the thread.
+
+    Returns
+    -------
+    dict
+        Captured artefacts from the run; currently a single ``"calls"``
+        key with the recorded WS service-call payloads.
+    """
     results: dict[str, object] = {}
 
     def run() -> None:

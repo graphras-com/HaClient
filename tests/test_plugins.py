@@ -14,9 +14,12 @@ from haclient.exceptions import HAClientError
 
 
 class _Custom(Entity):
+    """Tiny custom-domain `Entity` used as a registration fixture."""
+
     domain = "custom_domain"
 
     async def fire(self) -> None:
+        """Issue a no-op service call so the test can assert routing."""
         await self._call_service("noop")
 
 
