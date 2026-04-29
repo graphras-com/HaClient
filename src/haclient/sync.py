@@ -35,6 +35,12 @@ class _LoopThread:
     """Run an asyncio event loop in a dedicated thread."""
 
     def __init__(self) -> None:
+        """Start the background loop and block until it is running.
+
+        Spawns a daemon thread that owns a fresh event loop and waits
+        on a `threading.Event` until the loop has signalled that it is
+        ready to accept work.
+        """
         self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run, name="haclient-sync-loop", daemon=True)
         self._started = threading.Event()
@@ -97,6 +103,13 @@ class _SyncProxy:
         object.__setattr__(self, "_loop_thread", loop_thread)
 
     def __getattr__(self, name: str) -> Any:
+        """Forward attribute access, blocking-wrapping coroutine functions.
+
+        When the wrapped target's attribute is a coroutine function, a
+        sync wrapper is returned that submits the coroutine to the
+        background loop and waits for the result. Non-coroutine
+        attributes are passed through unchanged.
+        """
         attr = getattr(self._target, name)
         if inspect.iscoroutinefunction(attr):
             loop_thread = self._loop_thread
@@ -110,9 +123,11 @@ class _SyncProxy:
         return attr
 
     def __setattr__(self, name: str, value: Any) -> None:
+        """Forward attribute writes to the wrapped target."""
         setattr(self._target, name, value)
 
     def __repr__(self) -> str:
+        """Return a debug representation that highlights the wrapper."""
         return f"<Sync {self._target!r}>"
 
 
@@ -128,12 +143,21 @@ class _SyncDomainAccessor:
         object.__setattr__(self, "_loop_thread", loop_thread)
 
     def __call__(self, name: str) -> Any:
+        """Look up an entity by *name* and return a sync proxy."""
         return _SyncProxy(self._accessor(name), self._loop_thread)
 
     def __getitem__(self, name: str) -> Any:
+        """Look up an entity by *name* using ``[]`` syntax."""
         return _SyncProxy(self._accessor[name], self._loop_thread)
 
     def __getattr__(self, name: str) -> Any:
+        """Forward attribute access, blocking-wrapping coroutine functions.
+
+        Mirrors `_SyncProxy.__getattr__` but additionally wraps any
+        returned object that exposes ``entity_id`` in a `_SyncProxy`,
+        so that domain-level operations (e.g. ``ha.scene.create(...)``)
+        return blocking entities just like direct lookups do.
+        """
         attr = getattr(self._accessor, name)
         if inspect.iscoroutinefunction(attr):
             loop_thread = self._loop_thread
@@ -248,10 +272,12 @@ class SyncHAClient:
             self._loop_thread.stop()
 
     def __enter__(self) -> SyncHAClient:
+        """Enter the sync context manager by calling `connect`."""
         self.connect()
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        """Exit the sync context manager by calling `close`."""
         self.close()
 
     def refresh_all(self) -> None:

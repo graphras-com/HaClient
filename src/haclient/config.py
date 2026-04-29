@@ -138,5 +138,13 @@ class SharedSession:
     """
 
     def __init__(self, session: aiohttp.ClientSession | None = None) -> None:
+        """Wrap *session* and record whether it was externally owned.
+
+        Parameters
+        ----------
+        session : aiohttp.ClientSession or None, optional
+            Pre-existing session to share between transports. ``None``
+            leaves each adapter to manage its own session.
+        """
         self.session = session
         self.shared = session is not None

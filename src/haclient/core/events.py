@@ -157,6 +157,12 @@ class EventBus:
 
         Used by `StateStore` while the initial REST snapshot is being
         applied. Idempotent.
+
+        Parameters
+        ----------
+        event_type : str
+            Event type whose incoming frames should be queued in memory
+            until `drain_buffer` (or `discard_buffer`) is called.
         """
         self._buffers.setdefault(event_type, deque())
 
