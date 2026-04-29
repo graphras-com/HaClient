@@ -1,6 +1,6 @@
-"""Public façade — `HAClient`.
+"""Public facade — `HAClient`.
 
-The façade is intentionally thin. It wires together the infrastructure
+The facade is intentionally thin. It wires together the infrastructure
 adapters and core services, exposes the lifecycle methods, and presents
 domain accessors. **No domain-specific logic lives here**: adding a new
 domain is purely a matter of registering a `DomainSpec`.
@@ -9,7 +9,7 @@ Architecture
 ------------
 ::
 
-    ┌─────────── HAClient (façade) ──────────────┐
+    ┌─────────── HAClient (facade) ──────────────┐
     │  connection / events / services / state    │
     │  ha.<domain>("name") accessors             │
     └────┬───────────────┬────────────┬─────────┘
@@ -30,7 +30,7 @@ Architecture
 Both the connection lifecycle and the domain plugin layer are
 discovered/composed at construction time. Third-party domains
 discovered via the ``haclient.domains`` entry-point group are wired
-identically to the built-ins — the façade has no special path for them.
+identically to the built-ins — the facade has no special path for them.
 """
 
 from __future__ import annotations
@@ -400,7 +400,7 @@ class HAClient:
 
         Enables ``ha.light("kitchen")``, ``ha.scene.create(...)``, etc.
         for *any* registered domain — built-in or third-party — without
-        the façade needing to know which domains exist.
+        the facade needing to know which domains exist.
 
         Parameters
         ----------

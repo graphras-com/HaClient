@@ -21,7 +21,7 @@ nav:
   - Architecture: architecture.md
   - API Reference:
       - Overview: reference/index.md
-      - HAClient (façade): reference/api.md
+      - HAClient (facade): reference/api.md
       - Sync Client: reference/sync.md
       - Configuration: reference/config.md
       - Ports: reference/ports.md

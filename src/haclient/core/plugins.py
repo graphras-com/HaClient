@@ -56,7 +56,7 @@ class DomainSpec(Generic[E]):
     entity_cls : type[Entity]
         The entity class instantiated for this domain.
     accessor : str
-        Attribute name on the `HAClient` façade. Defaults to *name*.
+        Attribute name on the `HAClient` facade. Defaults to *name*.
     event_subscriptions : tuple of str
         Additional HA event types this domain wants delivered, beyond
         the always-on ``state_changed`` subscription.
@@ -82,7 +82,7 @@ class DomainSpec(Generic[E]):
 
 
 class DomainAccessor(Generic[E]):
-    """Runtime façade for one domain.
+    """Runtime facade for one domain.
 
     Returned by ``HAClient.<accessor>``. Exposes:
 

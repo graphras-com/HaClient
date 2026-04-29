@@ -1,3 +1,3 @@
-# HAClient (façade)
+# HAClient (facade)
 
 ::: haclient.api

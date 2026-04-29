@@ -5,7 +5,7 @@ WebSocket support.
 
 ## Features
 
-- Hexagonal architecture: a thin façade over `Connection`, `EventBus`,
+- Hexagonal architecture: a thin facade over `Connection`, `EventBus`,
   `ServiceCaller`, and `StateStore`.
 - Domain plugin model: built-ins register at import time; third parties
   ship via the `haclient.domains` entry-point group.

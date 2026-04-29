@@ -1,4 +1,4 @@
-"""End-to-end tests for the high-level HAClient façade."""
+"""End-to-end tests for the high-level HAClient facade."""
 
 from __future__ import annotations
 

@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class EventBus:
-    """Pub/sub façade over a `WebSocketPort`.
+    """Pub/sub facade over a `WebSocketPort`.
 
     Parameters
     ----------

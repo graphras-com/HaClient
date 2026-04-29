@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Connection:
-    """Lifecycle façade for the transport layer.
+    """Lifecycle facade for the transport layer.
 
     Parameters
     ----------
