@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "haclient"
-version = "1.1.0"
+version = "1.1.2"
 description = "Async-first, high-level Python client for Home Assistant (REST + WebSocket)."
 readme = "README.md"
 license = { file = "LICENSE" }
