@@ -21,6 +21,25 @@ from .fake_ha import FakeHA
 
 
 async def _make_ws(fake_ha: FakeHA, **kwargs: Any) -> WebSocketClient:
+    """Build a connected `AiohttpWebSocketAdapter` against the fake server.
+
+    Used throughout the WebSocket tests as a one-line factory. Disables
+    keepalive pings and shortens the request timeout so failures surface
+    quickly.
+
+    Parameters
+    ----------
+    fake_ha : FakeHA
+        Active fake server providing `ws_url` / `token`.
+    **kwargs : Any
+        Additional keyword arguments forwarded to the adapter
+        constructor (e.g. ``reconnect=True``).
+
+    Returns
+    -------
+    WebSocketClient
+        Connected adapter ready to send commands.
+    """
     ws = WebSocketClient(
         fake_ha.ws_url,
         fake_ha.token,
@@ -180,17 +199,27 @@ async def test_disconnect_listener_sync(fake_ha: FakeHA) -> None:
 
 
 def threading_like_flag() -> _Flag:
+    """Return a fresh `_Flag` mimicking the public `threading.Event` shape.
+
+    Used by tests that need a sync-friendly signal without paying for
+    the real `threading.Event` machinery.
+    """
     return _Flag()
 
 
 class _Flag:
+    """Tiny ``threading.Event``-like flag used by sync-listener tests."""
+
     def __init__(self) -> None:
+        """Initialise the flag in the unset state."""
         self._set = False
 
     def set(self) -> None:
+        """Mark the flag as set."""
         self._set = True
 
     def is_set(self) -> bool:
+        """Return ``True`` when `set` has been called."""
         return self._set
 
 

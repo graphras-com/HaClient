@@ -20,6 +20,7 @@ class _FakeWS:
     """
 
     def __init__(self) -> None:
+        """Initialise empty subscription / listener tracking state."""
         self.connected_flag: bool = True
         self.subscriptions: dict[int, tuple[str | None, Any]] = {}
         self.next_id = 0
@@ -30,16 +31,25 @@ class _FakeWS:
 
     @property
     def connected(self) -> bool:
+        """Return ``True`` while the simulated socket is open."""
         return self.connected_flag
 
-    async def connect(self) -> None: ...
+    async def connect(self) -> None:
+        """Stub: no-op connect to satisfy the `WebSocketPort` protocol."""
 
-    async def close(self) -> None: ...
+    async def close(self) -> None:
+        """Stub: no-op close to satisfy the `WebSocketPort` protocol."""
 
     async def send_command(self, payload: dict[str, Any], *, timeout: float | None = None) -> Any:
+        """Stub: ignore commands and return ``None``."""
         return None
 
     async def subscribe_events(self, handler: Any, event_type: str | None = None) -> int:
+        """Record a subscription and return a fresh id.
+
+        Setting `subscribe_failure` causes this to raise; tests use that
+        to exercise error paths.
+        """
         if self.subscribe_failure is not None:
             raise self.subscribe_failure
         self.next_id += 1
@@ -47,18 +57,33 @@ class _FakeWS:
         return self.next_id
 
     async def unsubscribe(self, subscription_id: int) -> None:
+        """Forget a subscription and record the id for assertions."""
         self.unsubscribed.append(subscription_id)
         self.subscriptions.pop(subscription_id, None)
 
     def on_disconnect(self, handler: Any) -> Any:
+        """Record a disconnect listener and return it."""
         self.disconnect_listeners.append(handler)
         return handler
 
     def on_reconnect(self, handler: Any) -> Any:
+        """Record a reconnect listener and return it."""
         self.reconnect_listeners.append(handler)
         return handler
 
     async def push(self, event_type: str, event: dict[str, Any]) -> None:
+        """Deliver *event* to every handler subscribed to *event_type*.
+
+        Used by tests to drive `EventBus` from outside without a real
+        WebSocket transport. Awaitable handlers are awaited.
+
+        Parameters
+        ----------
+        event_type : str
+            Event type whose subscribers should receive *event*.
+        event : dict
+            The event payload as it would arrive over the WS.
+        """
         for et, handler in self.subscriptions.values():
             if et == event_type:
                 result = handler(event)
