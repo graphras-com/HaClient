@@ -339,117 +339,29 @@ class SyncHAClient:
         """
         return _SyncDomainAccessor(self._client.domain(name), self._loop_thread)
 
-    def media_player(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `MediaPlayer`.
+    def __getattr__(self, name: str) -> _SyncDomainAccessor:
+        """Return a sync domain accessor for any registered domain.
+
+        Enables ``ha.light("kitchen")``, ``ha.scene.create(...)``, etc.
+        identically to `HAClient.__getattr__`, but wrapping everything
+        in blocking proxies.
 
         Parameters
         ----------
         name : str
-            Short entity name or full ``media_player.<name>`` id.
+            The domain or accessor name.
 
         Returns
         -------
-        _SyncProxy
-            Blocking proxy delegating to the async `MediaPlayer`.
+        _SyncDomainAccessor
+            Blocking accessor wrapping the underlying async accessor.
+
+        Raises
+        ------
+        AttributeError
+            If *name* does not match any active domain.
         """
-        return _SyncProxy(self._client.media_player(name), self._loop_thread)
-
-    def light(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Light`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``light.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `Light`.
-        """
-        return _SyncProxy(self._client.light(name), self._loop_thread)
-
-    def switch(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Switch`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``switch.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `Switch`.
-        """
-        return _SyncProxy(self._client.switch(name), self._loop_thread)
-
-    def climate(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Climate`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``climate.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `Climate`.
-        """
-        return _SyncProxy(self._client.climate(name), self._loop_thread)
-
-    def cover(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Cover`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``cover.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `Cover`.
-        """
-        return _SyncProxy(self._client.cover(name), self._loop_thread)
-
-    def sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `Sensor`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``sensor.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `Sensor`.
-        """
-        return _SyncProxy(self._client.sensor(name), self._loop_thread)
-
-    def binary_sensor(self, name: str) -> Any:
-        """Return a sync proxy wrapping the async `BinarySensor`.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name or full ``binary_sensor.<name>`` id.
-
-        Returns
-        -------
-        _SyncProxy
-            Blocking proxy delegating to the async `BinarySensor`.
-        """
-        return _SyncProxy(self._client.binary_sensor(name), self._loop_thread)
-
-    @property
-    def scene(self) -> _SyncDomainAccessor:
-        """Return a sync scene accessor."""
-        return _SyncDomainAccessor(self._client.scene, self._loop_thread)
-
-    @property
-    def timer(self) -> _SyncDomainAccessor:
-        """Return a sync timer accessor."""
-        return _SyncDomainAccessor(self._client.timer, self._loop_thread)
+        # Delegate to HAClient.__getattr__ which returns a DomainAccessor
+        # or raises AttributeError.
+        accessor = getattr(self._client, name)
+        return _SyncDomainAccessor(accessor, self._loop_thread)

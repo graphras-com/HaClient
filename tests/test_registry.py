@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from haclient import EntityRegistry, HAClient, Light
+from haclient import EntityRegistry, HAClient
+from haclient.domains.light import Light
 from haclient.exceptions import EntityNotFoundError
 
 

@@ -38,7 +38,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 import aiohttp
 
@@ -56,17 +56,6 @@ from haclient.core.state import StateStore
 from haclient.infra.rest_aiohttp import AiohttpRestAdapter
 from haclient.infra.ws_aiohttp import AiohttpWebSocketAdapter
 from haclient.ports import RestPort, WebSocketPort
-
-if TYPE_CHECKING:
-    from haclient.domains.binary_sensor import BinarySensor
-    from haclient.domains.climate import Climate
-    from haclient.domains.cover import Cover
-    from haclient.domains.light import Light
-    from haclient.domains.media_player import MediaPlayer
-    from haclient.domains.scene import Scene
-    from haclient.domains.sensor import Sensor
-    from haclient.domains.switch import Switch
-    from haclient.domains.timer import Timer
 
 
 class HAClient:
@@ -406,126 +395,37 @@ class HAClient:
             raise KeyError(f"Domain {name!r} is not active on this client")
         return accessor
 
-    # -- Built-in typed accessors ------------------------------------
+    def __getattr__(self, name: str) -> DomainAccessor[Any]:
+        """Return the `DomainAccessor` for a registered domain.
 
-    def light(self, name: str) -> Light:
-        """Return the `Light` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``light.`` prefix) or full
-            ``light.<name>`` entity id.
-
-        Returns
-        -------
-        Light
-            The (cached) entity instance.
-        """
-        return cast("Light", self._accessors["light"][name])
-
-    def switch(self, name: str) -> Switch:
-        """Return the `Switch` for *name*.
+        Enables ``ha.light("kitchen")``, ``ha.scene.create(...)``, etc.
+        for *any* registered domain — built-in or third-party — without
+        the façade needing to know which domains exist.
 
         Parameters
         ----------
         name : str
-            Short entity name (without the ``switch.`` prefix) or full
-            ``switch.<name>`` entity id.
+            The domain or accessor name (e.g. ``"light"``,
+            ``"media_player"``).
 
         Returns
         -------
-        Switch
-            The (cached) entity instance.
+        DomainAccessor
+            The accessor for the domain.
+
+        Raises
+        ------
+        AttributeError
+            If *name* does not match any active domain.
         """
-        return cast("Switch", self._accessors["switch"][name])
-
-    def climate(self, name: str) -> Climate:
-        """Return the `Climate` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``climate.`` prefix) or full
-            ``climate.<name>`` entity id.
-
-        Returns
-        -------
-        Climate
-            The (cached) entity instance.
-        """
-        return cast("Climate", self._accessors["climate"][name])
-
-    def cover(self, name: str) -> Cover:
-        """Return the `Cover` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``cover.`` prefix) or full
-            ``cover.<name>`` entity id.
-
-        Returns
-        -------
-        Cover
-            The (cached) entity instance.
-        """
-        return cast("Cover", self._accessors["cover"][name])
-
-    def sensor(self, name: str) -> Sensor:
-        """Return the `Sensor` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``sensor.`` prefix) or full
-            ``sensor.<name>`` entity id.
-
-        Returns
-        -------
-        Sensor
-            The (cached) entity instance.
-        """
-        return cast("Sensor", self._accessors["sensor"][name])
-
-    def binary_sensor(self, name: str) -> BinarySensor:
-        """Return the `BinarySensor` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``binary_sensor.`` prefix) or
-            full ``binary_sensor.<name>`` entity id.
-
-        Returns
-        -------
-        BinarySensor
-            The (cached) entity instance.
-        """
-        return cast("BinarySensor", self._accessors["binary_sensor"][name])
-
-    def media_player(self, name: str) -> MediaPlayer:
-        """Return the `MediaPlayer` for *name*.
-
-        Parameters
-        ----------
-        name : str
-            Short entity name (without the ``media_player.`` prefix) or
-            full ``media_player.<name>`` entity id.
-
-        Returns
-        -------
-        MediaPlayer
-            The (cached) entity instance.
-        """
-        return cast("MediaPlayer", self._accessors["media_player"][name])
-
-    @property
-    def scene(self) -> DomainAccessor[Scene]:
-        """Return the scene accessor (supports lookup + ``create``/``apply``)."""
-        return cast("DomainAccessor[Scene]", self._accessors["scene"])
-
-    @property
-    def timer(self) -> DomainAccessor[Timer]:
-        """Return the timer accessor (supports lookup + ``create``)."""
-        return cast("DomainAccessor[Timer]", self._accessors["timer"])
+        # Guard: only intercept after __init__ has populated _accessors.
+        try:
+            accessors: dict[str, DomainAccessor[Any]] = self.__dict__["_accessors"]
+        except KeyError:
+            raise AttributeError(name) from None
+        try:
+            return accessors[name]
+        except KeyError:
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {name!r}"
+            ) from None

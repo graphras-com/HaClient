@@ -7,8 +7,10 @@ from typing import Any
 
 import pytest
 
-from haclient import HAClient, Light, Switch
+from haclient import HAClient
 from haclient.config import derive_ws_url
+from haclient.domains.light import Light
+from haclient.domains.switch import Switch
 from haclient.exceptions import ConnectionClosedError, HAClientError
 
 from .fake_ha import FakeHA

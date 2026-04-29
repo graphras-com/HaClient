@@ -26,19 +26,6 @@ from haclient.core.plugins import (
 from haclient.core.registry import EntityRegistry
 from haclient.core.services import ServiceCaller
 from haclient.core.state import StateStore
-from haclient.domains import (
-    BinarySensor,
-    Climate,
-    Cover,
-    FavoriteItem,
-    Light,
-    MediaPlayer,
-    NowPlaying,
-    Scene,
-    Sensor,
-    Switch,
-    Timer,
-)
 from haclient.entity.base import Entity
 from haclient.exceptions import (
     AuthenticationError,
@@ -53,14 +40,11 @@ from haclient.sync import SyncHAClient
 
 __all__ = [
     "AuthenticationError",
-    "BinarySensor",
-    "Climate",
     "Clock",
     "CommandError",
     "Connection",
     "ConnectionClosedError",
     "ConnectionConfig",
-    "Cover",
     "DomainAccessor",
     "DomainRegistry",
     "DomainSpec",
@@ -69,22 +53,14 @@ __all__ = [
     "EntityNotFoundError",
     "EntityRegistry",
     "EventBus",
-    "FavoriteItem",
     "HAClient",
     "HAClientError",
-    "Light",
-    "MediaPlayer",
-    "NowPlaying",
     "RestPort",
-    "Scene",
-    "Sensor",
     "ServiceCaller",
     "ServicePolicy",
     "StateStore",
-    "Switch",
     "SyncHAClient",
     "TimeoutError",
-    "Timer",
     "WebSocketPort",
     "register_domain",
 ]
