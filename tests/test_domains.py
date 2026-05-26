@@ -884,3 +884,104 @@ async def test_valve_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     # Position changes fire for both transitions (order is not guaranteed
     # across distinct ``push_state_changed`` events).
     assert sorted(positions) == [(0, 100), (100, 0)]
+
+
+async def test_humidifier_actions(client: HAClient, fake_ha: FakeHA) -> None:
+    h = client.humidifier("bedroom")
+    await h.on()
+    await h.set_humidity(50)
+    await h.off()
+    await h.toggle()
+    calls = fake_ha.ws_service_calls
+    assert [c["service"] for c in calls] == ["turn_on", "set_humidity", "turn_off", "toggle"]
+    assert calls[1]["service_data"]["humidity"] == 50
+
+    h._apply_state(
+        {
+            "state": "on",
+            "attributes": {
+                "humidity": 45,
+                "current_humidity": 38,
+                "mode": "auto",
+                "available_modes": ["auto", "sleep", "baby"],
+                "device_class": "humidifier",
+            },
+        }
+    )
+    assert h.is_on
+    assert h.target_humidity == 45
+    assert h.current_humidity == 38
+    assert h.mode == "auto"
+    assert h.available_modes == ["auto", "sleep", "baby"]
+    assert h.device_class == "humidifier"
+
+    await h.set_mode("sleep")
+    assert fake_ha.ws_service_calls[-1]["service"] == "set_mode"
+    assert fake_ha.ws_service_calls[-1]["service_data"]["mode"] == "sleep"
+
+    with pytest.raises(ValueError):
+        await h.set_mode("nope")
+
+    with pytest.raises(ValueError):
+        await h.set_humidity(150)
+    with pytest.raises(ValueError):
+        await h.set_humidity(-1)
+
+
+async def test_humidifier_degrades_when_unsupported(client: HAClient, fake_ha: FakeHA) -> None:
+    h = client.humidifier("basement")
+    # Device reports no modes and no current humidity reading.
+    h._apply_state({"state": "off", "attributes": {}})
+    assert not h.is_on
+    assert h.target_humidity is None
+    assert h.current_humidity is None
+    assert h.mode is None
+    assert h.available_modes == []
+    assert h.device_class is None
+
+    # set_mode is a no-op when the device exposes no modes.
+    before = len(fake_ha.ws_service_calls)
+    await h.set_mode("auto")
+    assert len(fake_ha.ws_service_calls) == before
+
+
+async def test_humidifier_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    h = client.humidifier("nursery")
+
+    turned_on: list[tuple[Any, Any]] = []
+    turned_off: list[tuple[Any, Any]] = []
+    humidity_events: list[tuple[Any, Any]] = []
+    mode_events: list[tuple[Any, Any]] = []
+
+    @h.on_turn_on
+    def _on(old: Any, new: Any) -> None:
+        turned_on.append((old, new))
+
+    @h.on_turn_off
+    def _off(old: Any, new: Any) -> None:
+        turned_off.append((old, new))
+
+    @h.on_humidity_change
+    def _hum(old: Any, new: Any) -> None:
+        humidity_events.append((old, new))
+
+    @h.on_mode_change
+    def _mode(old: Any, new: Any) -> None:
+        mode_events.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "humidifier.nursery",
+        {"state": "on", "attributes": {"humidity": 55, "mode": "sleep"}},
+        {"state": "off", "attributes": {"humidity": 40, "mode": "auto"}},
+    )
+    await fake_ha.push_state_changed(
+        "humidifier.nursery",
+        {"state": "off", "attributes": {"humidity": 55, "mode": "sleep"}},
+        {"state": "on", "attributes": {"humidity": 55, "mode": "sleep"}},
+    )
+
+    await asyncio.sleep(0.05)
+    assert turned_on == [("off", "on")]
+    assert turned_off == [("on", "off")]
+    assert humidity_events == [(40, 55)]
+    assert mode_events == [("auto", "sleep")]

@@ -8,6 +8,7 @@ unavailable; this is the basis for opt-in / opt-out loading.
 from haclient.domains.binary_sensor import BinarySensor
 from haclient.domains.climate import Climate
 from haclient.domains.cover import Cover
+from haclient.domains.humidifier import Humidifier
 from haclient.domains.light import Light
 from haclient.domains.lock import Lock
 from haclient.domains.media_player import FavoriteItem, MediaPlayer, NowPlaying
@@ -22,6 +23,7 @@ __all__ = [
     "Climate",
     "Cover",
     "FavoriteItem",
+    "Humidifier",
     "Light",
     "Lock",
     "MediaPlayer",
