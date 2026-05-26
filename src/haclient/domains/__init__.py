@@ -9,6 +9,7 @@ from haclient.domains.binary_sensor import BinarySensor
 from haclient.domains.climate import Climate
 from haclient.domains.cover import Cover
 from haclient.domains.light import Light
+from haclient.domains.lock import Lock
 from haclient.domains.media_player import FavoriteItem, MediaPlayer, NowPlaying
 from haclient.domains.scene import Scene
 from haclient.domains.sensor import Sensor
@@ -21,6 +22,7 @@ __all__ = [
     "Cover",
     "FavoriteItem",
     "Light",
+    "Lock",
     "MediaPlayer",
     "NowPlaying",
     "Scene",

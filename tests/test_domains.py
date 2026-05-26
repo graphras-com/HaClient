@@ -639,3 +639,112 @@ async def test_timer_time_remaining_bad_remaining() -> None:
         assert t.time_remaining is None
     finally:
         await ha.close()
+
+
+# ---------------------------------------------------------------------------
+# Lock
+# ---------------------------------------------------------------------------
+
+
+async def test_lock_actions_and_state(client: HAClient, fake_ha: FakeHA) -> None:
+    """``lock`` / ``unlock`` dispatch the expected services and state flags work."""
+    door = client.lock("front_door")
+    await door.lock()
+    await door.unlock()
+    svc = [c["service"] for c in fake_ha.ws_service_calls]
+    assert svc == ["lock", "unlock"]
+    assert all(c["domain"] == "lock" for c in fake_ha.ws_service_calls)
+    assert all(
+        c["service_data"]["entity_id"] == "lock.front_door" for c in fake_ha.ws_service_calls
+    )
+
+    door._apply_state({"state": "locked", "attributes": {}})
+    assert door.is_locked
+    assert not door.is_unlocked
+    assert not door.is_jammed
+
+    door._apply_state({"state": "unlocked", "attributes": {}})
+    assert door.is_unlocked
+    assert not door.is_locked
+
+    door._apply_state({"state": "locking", "attributes": {}})
+    assert door.is_locking
+
+    door._apply_state({"state": "unlocking", "attributes": {}})
+    assert door.is_unlocking
+
+    door._apply_state({"state": "jammed", "attributes": {}})
+    assert door.is_jammed
+
+
+async def test_lock_open_supported(client: HAClient, fake_ha: FakeHA) -> None:
+    """``open()`` dispatches ``lock.open`` when ``OPEN`` feature is advertised."""
+    door = client.lock("smart_door")
+    # Bit 1 = LockEntityFeature.OPEN.
+    door._apply_state({"state": "locked", "attributes": {"supported_features": 1}})
+    assert door.supports_open is True
+
+    await door.open()
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == ["open"]
+
+
+async def test_lock_open_unsupported_is_noop(client: HAClient, fake_ha: FakeHA) -> None:
+    """``open()`` degrades safely when the hardware lacks the OPEN feature."""
+    door = client.lock("basic_door")
+    door._apply_state({"state": "locked", "attributes": {"supported_features": 0}})
+    assert door.supports_open is False
+
+    await door.open()
+    assert fake_ha.ws_service_calls == []
+
+    # Missing attribute entirely behaves the same.
+    door._apply_state({"state": "locked", "attributes": {}})
+    assert door.supports_open is False
+    await door.open()
+    assert fake_ha.ws_service_calls == []
+
+    # Non-int ``supported_features`` is treated as unsupported.
+    door._apply_state({"state": "locked", "attributes": {"supported_features": "1"}})
+    assert door.supports_open is False
+
+
+async def test_lock_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    """Lock listener decorators fire on the relevant state transitions."""
+    door = client.lock("hall")
+    locked: list[tuple[Any, Any]] = []
+    unlocked: list[tuple[Any, Any]] = []
+    jammed: list[tuple[Any, Any]] = []
+
+    @door.on_lock
+    def _on_lock(old: Any, new: Any) -> None:
+        locked.append((old, new))
+
+    @door.on_unlock
+    def _on_unlock(old: Any, new: Any) -> None:
+        unlocked.append((old, new))
+
+    @door.on_jam
+    def _on_jam(old: Any, new: Any) -> None:
+        jammed.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "lock.hall",
+        {"state": "locked", "attributes": {}},
+        {"state": "unlocked", "attributes": {}},
+    )
+    await fake_ha.push_state_changed(
+        "lock.hall",
+        {"state": "unlocked", "attributes": {}},
+        {"state": "locked", "attributes": {}},
+    )
+    await fake_ha.push_state_changed(
+        "lock.hall",
+        {"state": "jammed", "attributes": {}},
+        {"state": "locked", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+
+    assert locked == [("unlocked", "locked")]
+    assert unlocked == [("locked", "unlocked")]
+    assert jammed == [("locked", "jammed")]
