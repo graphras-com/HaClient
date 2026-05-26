@@ -748,3 +748,139 @@ async def test_lock_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     assert locked == [("unlocked", "locked")]
     assert unlocked == [("locked", "unlocked")]
     assert jammed == [("locked", "jammed")]
+
+
+async def test_valve_actions_full_featured(client: HAClient, fake_ha: FakeHA) -> None:
+    """A full-featured valve dispatches every intent-specific service."""
+    valve = client.valve("main_water")
+    # All ValveEntityFeature bits: OPEN|CLOSE|SET_POSITION|STOP = 15.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 15}})
+
+    await valve.open()
+    await valve.close()
+    await valve.stop()
+    await valve.set_position(40)
+    await valve.toggle()
+
+    svc = [c["service"] for c in fake_ha.ws_service_calls]
+    assert svc == ["open_valve", "close_valve", "stop_valve", "set_valve_position", "toggle"]
+    assert all(c["domain"] == "valve" for c in fake_ha.ws_service_calls)
+    position_call = _find_call(fake_ha, "set_valve_position")
+    assert position_call["service_data"]["position"] == 40
+
+
+async def test_valve_state_properties(client: HAClient) -> None:
+    """State helpers reflect the underlying HA state and attributes."""
+    valve = client.valve("garden")
+
+    valve._apply_state({"state": "open", "attributes": {"current_position": 75}})
+    assert valve.is_open
+    assert not valve.is_closed
+    assert not valve.is_opening
+    assert not valve.is_closing
+    assert valve.current_position == 75
+
+    valve._apply_state({"state": "closed", "attributes": {}})
+    assert valve.is_closed
+    assert not valve.is_open
+    assert valve.current_position is None
+
+    valve._apply_state({"state": "opening", "attributes": {"current_position": 50.0}})
+    assert valve.is_opening
+    assert valve.current_position == 50
+
+    valve._apply_state({"state": "closing", "attributes": {"current_position": "bad"}})
+    assert valve.is_closing
+    assert valve.current_position is None
+
+
+async def test_valve_degrades_when_features_missing(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_position`` and ``stop`` no-op on binary valves; ``open``/``close`` still work."""
+    valve = client.valve("shutoff")
+    # OPEN|CLOSE only — no SET_POSITION, no STOP.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 3}})
+
+    assert valve.supports_set_position is False
+    assert valve.supports_stop is False
+
+    await valve.set_position(50)
+    await valve.stop()
+    assert fake_ha.ws_service_calls == []
+
+    await valve.open()
+    await valve.close()
+    svc = [c["service"] for c in fake_ha.ws_service_calls]
+    assert svc == ["open_valve", "close_valve"]
+
+    # Missing attribute entirely behaves the same.
+    valve._apply_state({"state": "open", "attributes": {}})
+    assert valve.supports_set_position is False
+    assert valve.supports_stop is False
+
+    # Non-int ``supported_features`` is treated as unsupported.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": "15"}})
+    assert valve.supports_set_position is False
+    assert valve.supports_stop is False
+
+
+async def test_valve_supports_set_position_and_stop_when_advertised(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """Feature flags surface positional/stop support independently."""
+    valve = client.valve("irrigation")
+    # SET_POSITION only.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 4}})
+    assert valve.supports_set_position is True
+    assert valve.supports_stop is False
+    await valve.set_position(25)
+    await valve.stop()
+    svc = [c["service"] for c in fake_ha.ws_service_calls]
+    assert svc == ["set_valve_position"]
+
+    # STOP only.
+    fake_ha.ws_service_calls.clear()
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 8}})
+    assert valve.supports_set_position is False
+    assert valve.supports_stop is True
+    await valve.set_position(25)
+    await valve.stop()
+    svc = [c["service"] for c in fake_ha.ws_service_calls]
+    assert svc == ["stop_valve"]
+
+
+async def test_valve_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    """``on_open`` / ``on_close`` / ``on_position_change`` fire as expected."""
+    valve = client.valve("zone1")
+    opened: list[tuple[Any, Any]] = []
+    closed: list[tuple[Any, Any]] = []
+    positions: list[Any] = []
+
+    @valve.on_open
+    def _on_open(old: Any, new: Any) -> None:
+        opened.append((old, new))
+
+    @valve.on_close
+    def _on_close(old: Any, new: Any) -> None:
+        closed.append((old, new))
+
+    @valve.on_position_change
+    def _on_position(old: Any, new: Any) -> None:
+        positions.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "valve.zone1",
+        {"state": "closed", "attributes": {"current_position": 0}},
+        {"state": "open", "attributes": {"current_position": 100}},
+    )
+    await fake_ha.push_state_changed(
+        "valve.zone1",
+        {"state": "open", "attributes": {"current_position": 100}},
+        {"state": "closed", "attributes": {"current_position": 0}},
+    )
+    await asyncio.sleep(0.05)
+
+    assert opened == [("closed", "open")]
+    assert closed == [("open", "closed")]
+    # Position changes fire for both transitions (order is not guaranteed
+    # across distinct ``push_state_changed`` events).
+    assert sorted(positions) == [(0, 100), (100, 0)]
