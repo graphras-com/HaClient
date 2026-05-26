@@ -17,6 +17,7 @@ from haclient.domains.scene import Scene
 from haclient.domains.sensor import Sensor
 from haclient.domains.switch import Switch
 from haclient.domains.timer import Timer
+from haclient.domains.vacuum import Vacuum
 from haclient.domains.valve import Valve
 
 __all__ = [
@@ -34,5 +35,6 @@ __all__ = [
     "Sensor",
     "Switch",
     "Timer",
+    "Vacuum",
     "Valve",
 ]
