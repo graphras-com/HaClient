@@ -1315,3 +1315,269 @@ async def test_vacuum_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     assert errored == [("docked", "error")]
     assert battery == [(80, 75), (75, 90)]
     assert fan == [("balanced", "turbo"), ("turbo", "balanced")]
+
+
+# ---------------------------------------------------------------------------
+# Fan
+# ---------------------------------------------------------------------------
+
+
+# FanEntityFeature: SET_SPEED=1, OSCILLATE=2, DIRECTION=4, PRESET_MODE=8.
+_FAN_FULL_FEATURES = 1 | 2 | 4 | 8
+
+
+async def test_fan_actions_full_featured(client: HAClient, fake_ha: FakeHA) -> None:
+    """A full-featured fan dispatches every intent-specific service."""
+    ceiling = client.fan("bedroom_ceiling")
+    ceiling._apply_state(
+        {
+            "state": "on",
+            "attributes": {
+                "supported_features": _FAN_FULL_FEATURES,
+                "preset_modes": ["sleep", "auto", "natural"],
+            },
+        }
+    )
+
+    await ceiling.on()
+    await ceiling.set_percentage(50)
+    await ceiling.oscillate(True)
+    await ceiling.set_direction("reverse")
+    await ceiling.set_preset_mode("sleep")
+    await ceiling.off()
+    await ceiling.toggle()
+
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == [
+        "turn_on",
+        "set_percentage",
+        "oscillate",
+        "set_direction",
+        "set_preset_mode",
+        "turn_off",
+        "toggle",
+    ]
+    assert all(c["domain"] == "fan" for c in fake_ha.ws_service_calls)
+    assert all(
+        c["service_data"]["entity_id"] == "fan.bedroom_ceiling" for c in fake_ha.ws_service_calls
+    )
+
+    pct = _find_call(fake_ha, "set_percentage")
+    assert pct["service_data"]["percentage"] == 50
+
+    osc = _find_call(fake_ha, "oscillate")
+    assert osc["service_data"]["oscillating"] is True
+
+    direction = _find_call(fake_ha, "set_direction")
+    assert direction["service_data"]["direction"] == "reverse"
+
+    preset = _find_call(fake_ha, "set_preset_mode")
+    assert preset["service_data"]["preset_mode"] == "sleep"
+
+
+async def test_fan_state_props() -> None:
+    """Fan state properties reflect the underlying attributes."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        ceiling = ha.fan("bedroom_ceiling")
+        ceiling._apply_state(
+            {
+                "state": "on",
+                "attributes": {
+                    "percentage": 66,
+                    "preset_mode": "auto",
+                    "preset_modes": ["auto", "sleep", "natural"],
+                    "oscillating": False,
+                    "direction": "forward",
+                    "supported_features": _FAN_FULL_FEATURES,
+                },
+            }
+        )
+        assert ceiling.is_on
+        assert ceiling.percentage == 66
+        assert ceiling.preset_mode == "auto"
+        assert ceiling.preset_modes == ["auto", "sleep", "natural"]
+        assert ceiling.oscillating is False
+        assert ceiling.direction == "forward"
+        assert ceiling.supports_set_speed
+        assert ceiling.supports_oscillate
+        assert ceiling.supports_direction
+        assert ceiling.supports_preset_mode
+
+        # Missing / malformed attributes degrade to None / empty.
+        ceiling._apply_state({"state": "off", "attributes": {}})
+        assert not ceiling.is_on
+        assert ceiling.percentage is None
+        assert ceiling.preset_mode is None
+        assert ceiling.preset_modes == []
+        assert ceiling.oscillating is None
+        assert ceiling.direction is None
+
+        # Non-string preset_modes entries are filtered out.
+        ceiling._apply_state({"state": "off", "attributes": {"preset_modes": ["a", 1, "b", None]}})
+        assert ceiling.preset_modes == ["a", "b"]
+
+        # Non-list preset_modes returns empty list.
+        ceiling._apply_state({"state": "off", "attributes": {"preset_modes": "not-a-list"}})
+        assert ceiling.preset_modes == []
+
+        # Non-bool oscillating returns None.
+        ceiling._apply_state({"state": "off", "attributes": {"oscillating": "yes"}})
+        assert ceiling.oscillating is None
+
+        # Non-int supported_features is treated as unsupported.
+        ceiling._apply_state({"state": "off", "attributes": {"supported_features": "15"}})
+        assert ceiling.supports_set_speed is False
+        assert ceiling.supports_oscillate is False
+        assert ceiling.supports_direction is False
+        assert ceiling.supports_preset_mode is False
+    finally:
+        await ha.close()
+
+
+async def test_fan_set_percentage_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_percentage`` enforces the 0-100 range before checking support."""
+    ceiling = client.fan("bedroom_ceiling")
+    ceiling._apply_state({"state": "on", "attributes": {"supported_features": _FAN_FULL_FEATURES}})
+
+    with pytest.raises(ValueError):
+        await ceiling.set_percentage(150)
+    with pytest.raises(ValueError):
+        await ceiling.set_percentage(-1)
+
+    # Boundary values are accepted.
+    await ceiling.set_percentage(0)
+    await ceiling.set_percentage(100)
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == ["set_percentage", "set_percentage"]
+
+
+async def test_fan_set_direction_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_direction`` rejects unknown direction strings."""
+    ceiling = client.fan("bedroom_ceiling")
+    ceiling._apply_state({"state": "on", "attributes": {"supported_features": _FAN_FULL_FEATURES}})
+
+    with pytest.raises(ValueError):
+        await ceiling.set_direction("sideways")
+
+    await ceiling.set_direction("forward")
+    await ceiling.set_direction("reverse")
+    assert [c["service_data"]["direction"] for c in fake_ha.ws_service_calls] == [
+        "forward",
+        "reverse",
+    ]
+
+
+async def test_fan_set_preset_mode_rejects_unknown(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_preset_mode`` rejects modes not in ``preset_modes``."""
+    ceiling = client.fan("bedroom_ceiling")
+    ceiling._apply_state(
+        {
+            "state": "on",
+            "attributes": {
+                "supported_features": _FAN_FULL_FEATURES,
+                "preset_modes": ["auto", "sleep"],
+            },
+        }
+    )
+
+    with pytest.raises(ValueError):
+        await ceiling.set_preset_mode("hurricane")
+    # No service call should be recorded for the rejected mode.
+    assert fake_ha.ws_service_calls == []
+
+
+async def test_fan_unsupported_features_are_noops(client: HAClient, fake_ha: FakeHA) -> None:
+    """Optional actions degrade safely when ``supported_features`` lacks the bit."""
+    basic = client.fan("basic")
+    # No supported_features attribute at all.
+    basic._apply_state({"state": "on", "attributes": {}})
+
+    assert basic.supports_set_speed is False
+    assert basic.supports_oscillate is False
+    assert basic.supports_direction is False
+    assert basic.supports_preset_mode is False
+
+    # All gated actions become no-ops; only the unconditional turn_on /
+    # turn_off / toggle reach the bus.
+    await basic.set_percentage(50)
+    await basic.oscillate(True)
+    await basic.set_direction("forward")
+    await basic.set_preset_mode("sleep")
+
+    assert fake_ha.ws_service_calls == []
+
+    # on/off/toggle do not depend on supported_features.
+    await basic.on()
+    await basic.off()
+    await basic.toggle()
+    assert [c["service"] for c in fake_ha.ws_service_calls] == [
+        "turn_on",
+        "turn_off",
+        "toggle",
+    ]
+
+
+async def test_fan_set_preset_mode_skipped_when_no_modes(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_preset_mode`` is a no-op when ``preset_modes`` is empty."""
+    ceiling = client.fan("ceiling")
+    # Advertise PRESET_MODE (bit 8) but withhold the preset_modes list.
+    ceiling._apply_state(
+        {
+            "state": "on",
+            "attributes": {"supported_features": 8},
+        }
+    )
+    await ceiling.set_preset_mode("sleep")
+    assert fake_ha.ws_service_calls == []
+
+
+async def test_fan_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    """Fan listener decorators fire on the relevant transitions."""
+    ceiling = client.fan("study")
+    turned_on: list[tuple[Any, Any]] = []
+    turned_off: list[tuple[Any, Any]] = []
+    speed: list[tuple[Any, Any]] = []
+    direction: list[tuple[Any, Any]] = []
+
+    @ceiling.on_turn_on
+    def _on(old: Any, new: Any) -> None:
+        turned_on.append((old, new))
+
+    @ceiling.on_turn_off
+    def _off(old: Any, new: Any) -> None:
+        turned_off.append((old, new))
+
+    @ceiling.on_speed_change
+    def _speed(old: Any, new: Any) -> None:
+        speed.append((old, new))
+
+    @ceiling.on_direction_change
+    def _dir(old: Any, new: Any) -> None:
+        direction.append((old, new))
+
+    # Signature: push_state_changed(entity_id, new_state, old_state).
+    # off -> on, percentage 0 -> 50.
+    await fake_ha.push_state_changed(
+        "fan.study",
+        {"state": "on", "attributes": {"percentage": 50, "direction": "forward"}},
+        {"state": "off", "attributes": {"percentage": 0, "direction": "forward"}},
+    )
+    # on -> on, percentage 50 -> 75, direction forward -> reverse.
+    await fake_ha.push_state_changed(
+        "fan.study",
+        {"state": "on", "attributes": {"percentage": 75, "direction": "reverse"}},
+        {"state": "on", "attributes": {"percentage": 50, "direction": "forward"}},
+    )
+    # on -> off, percentage 75 -> 0, direction reverse -> forward.
+    await fake_ha.push_state_changed(
+        "fan.study",
+        {"state": "off", "attributes": {"percentage": 0, "direction": "forward"}},
+        {"state": "on", "attributes": {"percentage": 75, "direction": "reverse"}},
+    )
+    await asyncio.sleep(0.05)
+
+    assert turned_on == [("off", "on")]
+    assert turned_off == [("on", "off")]
+    assert speed == [(0, 50), (50, 75), (75, 0)]
+    assert direction == [("forward", "reverse"), ("reverse", "forward")]

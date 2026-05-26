@@ -10,6 +10,7 @@ from haclient.domains.binary_sensor import BinarySensor
 from haclient.domains.climate import Climate
 from haclient.domains.cover import Cover
 from haclient.domains.event import Event
+from haclient.domains.fan import Fan
 from haclient.domains.humidifier import Humidifier
 from haclient.domains.light import Light
 from haclient.domains.lock import Lock
@@ -27,6 +28,7 @@ __all__ = [
     "Climate",
     "Cover",
     "Event",
+    "Fan",
     "FavoriteItem",
     "Humidifier",
     "Light",
