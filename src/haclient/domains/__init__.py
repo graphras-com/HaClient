@@ -5,6 +5,7 @@ shared `DomainRegistry`. Domains that are not imported are simply
 unavailable; this is the basis for opt-in / opt-out loading.
 """
 
+from haclient.domains.air_quality import AirQuality
 from haclient.domains.binary_sensor import BinarySensor
 from haclient.domains.climate import Climate
 from haclient.domains.cover import Cover
@@ -19,6 +20,7 @@ from haclient.domains.timer import Timer
 from haclient.domains.valve import Valve
 
 __all__ = [
+    "AirQuality",
     "BinarySensor",
     "Climate",
     "Cover",
