@@ -985,3 +985,138 @@ async def test_humidifier_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     assert turned_off == [("on", "off")]
     assert humidity_events == [(40, 55)]
     assert mode_events == [("auto", "sleep")]
+
+
+# ---------------------------------------------------------------------------
+# Air quality
+# ---------------------------------------------------------------------------
+
+
+async def test_air_quality_full_metrics() -> None:
+    """Every typed metric is read from its underlying attribute."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        aq = ha.air_quality("bedroom")
+        aq._apply_state(
+            {
+                "state": "42",
+                "attributes": {
+                    "particulate_matter_2_5": 12.3,
+                    "particulate_matter_10": 20,
+                    "carbon_dioxide": 800,
+                    "carbon_monoxide": 1.5,
+                    "volatile_organic_compounds": 0.4,
+                    "nitrogen_dioxide": 5,
+                    "ozone": 18.0,
+                },
+            }
+        )
+        # AQI falls back to the state when no explicit attribute is set.
+        assert aq.air_quality_index == 42.0
+        assert aq.particulate_matter_2_5 == 12.3
+        assert aq.particulate_matter_10 == 20
+        assert aq.carbon_dioxide == 800
+        assert aq.carbon_monoxide == 1.5
+        assert aq.volatile_organic_compounds == 0.4
+        assert aq.nitrogen_dioxide == 5
+        assert aq.ozone == 18.0
+    finally:
+        await ha.close()
+
+
+async def test_air_quality_degrades_when_metrics_missing() -> None:
+    """Unsupported metrics return ``None`` rather than raising."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        aq = ha.air_quality("minimal")
+        aq._apply_state({"state": "unknown", "attributes": {}})
+        assert aq.air_quality_index is None
+        assert aq.particulate_matter_2_5 is None
+        assert aq.particulate_matter_10 is None
+        assert aq.carbon_dioxide is None
+        assert aq.carbon_monoxide is None
+        assert aq.volatile_organic_compounds is None
+        assert aq.nitrogen_dioxide is None
+        assert aq.ozone is None
+    finally:
+        await ha.close()
+
+
+async def test_air_quality_index_prefers_explicit_attribute() -> None:
+    """An explicit ``air_quality_index`` attribute overrides the state."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        aq = ha.air_quality("outdoor")
+        aq._apply_state(
+            {
+                "state": "99",
+                "attributes": {"air_quality_index": 55},
+            }
+        )
+        assert aq.air_quality_index == 55
+    finally:
+        await ha.close()
+
+
+async def test_air_quality_coercion_handles_strings_and_bad_values() -> None:
+    """Numeric strings coerce to ``float``; junk values yield ``None``."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        aq = ha.air_quality("noisy")
+        aq._apply_state(
+            {
+                "state": "unavailable",
+                "attributes": {
+                    "particulate_matter_2_5": "12.5",
+                    "carbon_dioxide": "not-a-number",
+                    "carbon_monoxide": True,  # bools are not real readings
+                    "ozone": "",
+                    "nitrogen_dioxide": [1, 2, 3],  # unsupported type -> None
+                },
+            }
+        )
+        assert aq.air_quality_index is None
+        assert aq.particulate_matter_2_5 == 12.5
+        assert aq.carbon_dioxide is None
+        assert aq.carbon_monoxide is None
+        assert aq.ozone is None
+        assert aq.nitrogen_dioxide is None
+    finally:
+        await ha.close()
+
+
+async def test_air_quality_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    """``on_aqi_change`` / ``on_pm25_change`` / ``on_co2_change`` fire as expected."""
+    aq = client.air_quality("bedroom")
+    aqi_events: list[tuple[Any, Any]] = []
+    pm25_events: list[tuple[Any, Any]] = []
+    co2_events: list[tuple[Any, Any]] = []
+
+    @aq.on_aqi_change
+    def _aqi(old: Any, new: Any) -> None:
+        aqi_events.append((old, new))
+
+    @aq.on_pm25_change
+    def _pm25(old: Any, new: Any) -> None:
+        pm25_events.append((old, new))
+
+    @aq.on_co2_change
+    def _co2(old: Any, new: Any) -> None:
+        co2_events.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "air_quality.bedroom",
+        {
+            "state": "55",
+            "attributes": {"particulate_matter_2_5": 14.0, "carbon_dioxide": 950},
+        },
+        {
+            "state": "42",
+            "attributes": {"particulate_matter_2_5": 10.0, "carbon_dioxide": 800},
+        },
+    )
+    await asyncio.sleep(0.05)
+
+    assert aqi_events == [("42", "55")]
+    assert pm25_events == [(10.0, 14.0)]
+    assert co2_events == [(800, 950)]
