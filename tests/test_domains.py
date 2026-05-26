@@ -1120,3 +1120,198 @@ async def test_air_quality_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     assert aqi_events == [("42", "55")]
     assert pm25_events == [(10.0, 14.0)]
     assert co2_events == [(800, 950)]
+
+
+# ---------------------------------------------------------------------------
+# Vacuum
+# ---------------------------------------------------------------------------
+
+
+# All ``VacuumEntityFeature`` bits OR'd together (START|PAUSE|STOP|
+# RETURN_HOME|FAN_SPEED|LOCATE|SEND_COMMAND|CLEAN_SPOT).
+_VACUUM_FULL_FEATURES = 8192 | 4 | 8 | 16 | 32 | 512 | 256 | 1024
+
+
+async def test_vacuum_actions_full_featured(client: HAClient, fake_ha: FakeHA) -> None:
+    """A full-featured vacuum dispatches every intent-specific service."""
+    robo = client.vacuum("roborock")
+    robo._apply_state(
+        {"state": "cleaning", "attributes": {"supported_features": _VACUUM_FULL_FEATURES}}
+    )
+
+    await robo.start()
+    await robo.pause()
+    await robo.stop()
+    await robo.return_to_base()
+    await robo.locate()
+    await robo.clean_spot()
+    await robo.set_fan_speed("turbo")
+    await robo.send_command("set_zone", {"zone": [1, 2, 3, 4]})
+
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == [
+        "start",
+        "pause",
+        "stop",
+        "return_to_base",
+        "locate",
+        "clean_spot",
+        "set_fan_speed",
+        "send_command",
+    ]
+    assert all(c["domain"] == "vacuum" for c in fake_ha.ws_service_calls)
+    assert all(
+        c["service_data"]["entity_id"] == "vacuum.roborock" for c in fake_ha.ws_service_calls
+    )
+
+    fan = _find_call(fake_ha, "set_fan_speed")
+    assert fan["service_data"]["fan_speed"] == "turbo"
+
+    cmd = _find_call(fake_ha, "send_command")
+    assert cmd["service_data"]["command"] == "set_zone"
+    assert cmd["service_data"]["params"] == {"zone": [1, 2, 3, 4]}
+
+
+async def test_vacuum_send_command_without_params(client: HAClient, fake_ha: FakeHA) -> None:
+    """``send_command`` omits the ``params`` key when none are provided."""
+    robo = client.vacuum("roborock")
+    robo._apply_state(
+        {"state": "cleaning", "attributes": {"supported_features": _VACUUM_FULL_FEATURES}}
+    )
+
+    await robo.send_command("find_dock")
+    cmd = _find_call(fake_ha, "send_command")
+    assert cmd["service_data"]["command"] == "find_dock"
+    assert "params" not in cmd["service_data"]
+
+
+async def test_vacuum_unsupported_features_are_noops(client: HAClient, fake_ha: FakeHA) -> None:
+    """Actions degrade safely on vacuums that lack the relevant feature bits."""
+    basic = client.vacuum("basic")
+    # No supported_features attribute at all.
+    basic._apply_state({"state": "docked", "attributes": {}})
+
+    assert basic.supports_start is False
+    assert basic.supports_pause is False
+    assert basic.supports_stop is False
+    assert basic.supports_return_home is False
+    assert basic.supports_locate is False
+    assert basic.supports_fan_speed is False
+    assert basic.supports_send_command is False
+    assert basic.supports_clean_spot is False
+
+    await basic.start()
+    await basic.pause()
+    await basic.stop()
+    await basic.return_to_base()
+    await basic.locate()
+    await basic.clean_spot()
+    await basic.set_fan_speed("turbo")
+    await basic.send_command("find_dock", {"x": 1})
+
+    assert fake_ha.ws_service_calls == []
+
+    # Non-int supported_features is treated as unsupported.
+    basic._apply_state({"state": "docked", "attributes": {"supported_features": "32"}})
+    assert basic.supports_fan_speed is False
+
+
+async def test_vacuum_state_props() -> None:
+    """Vacuum state convenience properties reflect the underlying string state."""
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        robo = ha.vacuum("roborock")
+        robo._apply_state(
+            {
+                "state": "cleaning",
+                "attributes": {
+                    "battery_level": 72,
+                    "fan_speed": "balanced",
+                    "fan_speed_list": ["quiet", "balanced", "turbo"],
+                },
+            }
+        )
+        assert robo.is_cleaning
+        assert not robo.is_docked
+        assert robo.battery_level == 72
+        assert robo.fan_speed == "balanced"
+        assert robo.fan_speed_list == ["quiet", "balanced", "turbo"]
+
+        for state, prop in [
+            ("docked", "is_docked"),
+            ("idle", "is_idle"),
+            ("paused", "is_paused"),
+            ("returning", "is_returning"),
+            ("error", "is_error"),
+        ]:
+            robo._apply_state({"state": state, "attributes": {}})
+            assert getattr(robo, prop)
+
+        # Missing / malformed attributes degrade to None / empty.
+        robo._apply_state({"state": "docked", "attributes": {}})
+        assert robo.battery_level is None
+        assert robo.fan_speed is None
+        assert robo.fan_speed_list == []
+
+        # Non-string entries are filtered out of fan_speed_list.
+        robo._apply_state({"state": "docked", "attributes": {"fan_speed_list": ["a", 1, "b"]}})
+        assert robo.fan_speed_list == ["a", "b"]
+
+        # Non-list fan_speed_list returns empty list.
+        robo._apply_state({"state": "docked", "attributes": {"fan_speed_list": "not-a-list"}})
+        assert robo.fan_speed_list == []
+    finally:
+        await ha.close()
+
+
+async def test_vacuum_listeners(client: HAClient, fake_ha: FakeHA) -> None:
+    """Vacuum listener decorators fire on the relevant transitions."""
+    robo = client.vacuum("hall")
+    started: list[tuple[Any, Any]] = []
+    docked: list[tuple[Any, Any]] = []
+    errored: list[tuple[Any, Any]] = []
+    battery: list[tuple[Any, Any]] = []
+    fan: list[tuple[Any, Any]] = []
+
+    @robo.on_start
+    def _on_start(old: Any, new: Any) -> None:
+        started.append((old, new))
+
+    @robo.on_dock
+    def _on_dock(old: Any, new: Any) -> None:
+        docked.append((old, new))
+
+    @robo.on_error
+    def _on_error(old: Any, new: Any) -> None:
+        errored.append((old, new))
+
+    @robo.on_battery_change
+    def _on_battery(old: Any, new: Any) -> None:
+        battery.append((old, new))
+
+    @robo.on_fan_speed_change
+    def _on_fan(old: Any, new: Any) -> None:
+        fan.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "vacuum.hall",
+        {"state": "cleaning", "attributes": {"battery_level": 75, "fan_speed": "turbo"}},
+        {"state": "docked", "attributes": {"battery_level": 80, "fan_speed": "balanced"}},
+    )
+    await fake_ha.push_state_changed(
+        "vacuum.hall",
+        {"state": "docked", "attributes": {"battery_level": 90, "fan_speed": "balanced"}},
+        {"state": "cleaning", "attributes": {"battery_level": 75, "fan_speed": "turbo"}},
+    )
+    await fake_ha.push_state_changed(
+        "vacuum.hall",
+        {"state": "error", "attributes": {}},
+        {"state": "docked", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+
+    assert started == [("docked", "cleaning")]
+    assert docked == [("cleaning", "docked")]
+    assert errored == [("docked", "error")]
+    assert battery == [(80, 75), (75, 90)]
+    assert fan == [("balanced", "turbo"), ("turbo", "balanced")]
