@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from haclient.core.plugins import DomainSpec, register_domain
+from haclient.domains._utils import validate_range
 from haclient.entity.base import Entity, ValueChangeHandler
 
 
@@ -103,10 +104,18 @@ class Cover(Entity):
         Parameters
         ----------
         position : int
-            Target position, clamped/coerced to ``int``. ``0`` is fully
+            Target position in the range 0--100. ``0`` is fully
             closed; ``100`` is fully open.
+
+        Raises
+        ------
+        ValueError
+            If *position* is outside the 0--100 range.
         """
-        await self._call_service("set_cover_position", {"position": int(position)})
+        await self._call_service(
+            "set_cover_position",
+            {"position": validate_range(position, 0, 100, "position")},
+        )
 
     async def toggle(self) -> None:
         """Toggle open/close state."""

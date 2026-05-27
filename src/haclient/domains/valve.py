@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from haclient.core.plugins import DomainSpec, register_domain
+from haclient.domains._utils import validate_range
 from haclient.entity.base import Entity, ValueChangeHandler
 
 _LOGGER = logging.getLogger(__name__)
@@ -176,8 +177,13 @@ class Valve(Entity):
         Parameters
         ----------
         position : int
-            Target position (``0`` = fully closed, ``100`` = fully
-            open), coerced to ``int``.
+            Target position in the range 0--100 (``0`` = fully closed,
+            ``100`` = fully open).
+
+        Raises
+        ------
+        ValueError
+            If *position* is outside the 0--100 range.
 
         Notes
         -----
@@ -185,14 +191,17 @@ class Valve(Entity):
         ``SET_POSITION`` feature (e.g. a binary water shutoff), this
         method logs a debug message and returns without raising.
         Callers can pre-check with `supports_set_position`.
+        Range validation always runs, even when the feature is absent,
+        so callers receive an immediate error for clearly invalid input.
         """
+        value = validate_range(position, 0, 100, "position")
         if not self.supports_set_position:
             _LOGGER.debug(
                 "set_position() unsupported for %s; skipping (no ValveEntityFeature.SET_POSITION)",
                 self.entity_id,
             )
             return
-        await self._call_service("set_valve_position", {"position": int(position)})
+        await self._call_service("set_valve_position", {"position": value})
 
     async def toggle(self) -> None:
         """Toggle open/close state."""

@@ -1581,3 +1581,89 @@ async def test_fan_listeners(client: HAClient, fake_ha: FakeHA) -> None:
     assert turned_off == [("on", "off")]
     assert speed == [(0, 50), (50, 75), (75, 0)]
     assert direction == [("forward", "reverse"), ("reverse", "forward")]
+
+
+# ---------------------------------------------------------------------------
+# Range validation — issue #75
+# ---------------------------------------------------------------------------
+
+
+async def test_light_set_brightness_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_brightness`` enforces the 0-255 range."""
+    light = client.light("kitchen")
+
+    with pytest.raises(ValueError, match="brightness"):
+        await light.set_brightness(-1)
+    with pytest.raises(ValueError, match="brightness"):
+        await light.set_brightness(256)
+
+    # Boundary values are accepted.
+    await light.set_brightness(0)
+    await light.set_brightness(255)
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == ["turn_on", "turn_on"]
+    assert fake_ha.ws_service_calls[0]["service_data"]["brightness"] == 0
+    assert fake_ha.ws_service_calls[1]["service_data"]["brightness"] == 255
+
+
+async def test_light_set_rgb_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_rgb`` enforces the 0-255 range on each component."""
+    light = client.light("kitchen")
+
+    with pytest.raises(ValueError, match="r"):
+        await light.set_rgb(-1, 0, 0)
+    with pytest.raises(ValueError, match="r"):
+        await light.set_rgb(256, 0, 0)
+    with pytest.raises(ValueError, match="g"):
+        await light.set_rgb(0, -1, 0)
+    with pytest.raises(ValueError, match="g"):
+        await light.set_rgb(0, 256, 0)
+    with pytest.raises(ValueError, match="b"):
+        await light.set_rgb(0, 0, -1)
+    with pytest.raises(ValueError, match="b"):
+        await light.set_rgb(0, 0, 256)
+
+    # Boundary values are accepted.
+    await light.set_rgb(0, 0, 0)
+    await light.set_rgb(255, 255, 255)
+    assert fake_ha.ws_service_calls[0]["service_data"]["rgb_color"] == [0, 0, 0]
+    assert fake_ha.ws_service_calls[1]["service_data"]["rgb_color"] == [255, 255, 255]
+
+
+async def test_cover_set_position_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_position`` enforces the 0-100 range."""
+    cv = client.cover("garage")
+
+    with pytest.raises(ValueError, match="position"):
+        await cv.set_position(-1)
+    with pytest.raises(ValueError, match="position"):
+        await cv.set_position(101)
+
+    # Boundary values are accepted.
+    await cv.set_position(0)
+    await cv.set_position(100)
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == ["set_cover_position", "set_cover_position"]
+    assert fake_ha.ws_service_calls[0]["service_data"]["position"] == 0
+    assert fake_ha.ws_service_calls[1]["service_data"]["position"] == 100
+
+
+async def test_valve_set_position_validation(client: HAClient, fake_ha: FakeHA) -> None:
+    """``set_position`` enforces the 0-100 range even when the feature is absent."""
+    valve = client.valve("main_water")
+
+    # Range validation fires regardless of feature support.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 0}})
+    with pytest.raises(ValueError, match="position"):
+        await valve.set_position(-1)
+    with pytest.raises(ValueError, match="position"):
+        await valve.set_position(101)
+
+    # With feature support, boundary values are accepted and dispatched.
+    valve._apply_state({"state": "open", "attributes": {"supported_features": 15}})
+    await valve.set_position(0)
+    await valve.set_position(100)
+    services = [c["service"] for c in fake_ha.ws_service_calls]
+    assert services == ["set_valve_position", "set_valve_position"]
+    assert fake_ha.ws_service_calls[0]["service_data"]["position"] == 0
+    assert fake_ha.ws_service_calls[1]["service_data"]["position"] == 100

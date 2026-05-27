@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
+from haclient.domains._utils import validate_range
 from haclient.entity.base import Entity, ValueChangeHandler
 
 
@@ -151,12 +152,17 @@ class Light(Entity):
         Parameters
         ----------
         brightness : int
-            New brightness value, coerced to ``int``. ``0`` turns the
+            New brightness value in the range 0--255. ``0`` turns the
             light off; ``255`` is full brightness.
         transition : float or None, optional
             Seconds for the transition. Forwarded to HA when set.
+
+        Raises
+        ------
+        ValueError
+            If *brightness* is outside the 0--255 range.
         """
-        data: dict[str, Any] = {"brightness": int(brightness)}
+        data: dict[str, Any] = {"brightness": validate_range(brightness, 0, 255, "brightness")}
         if transition is not None:
             data["transition"] = transition
         await self._call_service("turn_on", data)
@@ -189,15 +195,25 @@ class Light(Entity):
         Parameters
         ----------
         r : int
-            Red component (0-255).
+            Red component (0--255).
         g : int
-            Green component (0-255).
+            Green component (0--255).
         b : int
-            Blue component (0-255).
+            Blue component (0--255).
         transition : float or None, optional
             Seconds for the transition. Forwarded to HA when set.
+
+        Raises
+        ------
+        ValueError
+            If any component is outside the 0--255 range.
         """
-        data: dict[str, Any] = {"rgb_color": [r, g, b]}
+        rgb = [
+            validate_range(r, 0, 255, "r"),
+            validate_range(g, 0, 255, "g"),
+            validate_range(b, 0, 255, "b"),
+        ]
+        data: dict[str, Any] = {"rgb_color": rgb}
         if transition is not None:
             data["transition"] = transition
         await self._call_service("turn_on", data)
