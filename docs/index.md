@@ -18,8 +18,20 @@ WebSocket support.
 - Real-time state-change listeners with attribute and transition
   filtering.
 - Synchronous blocking wrapper for scripts, REPL, and Jupyter.
-- Explicit service-call routing: `prefer="ws" | "rest" | "auto"`.
+- Explicit service-call routing (`prefer="ws" | "rest" | "auto"`)
+  available via `client.services.call(...)` for advanced use; the
+  normal path is the high-level domain methods.
 - Fully typed (PEP 561) with strict mypy enforcement.
+
+## Next steps
+
+- New here? Start with the [Guides](guides/index.md) — they walk
+  through async lifecycle, listeners, reconnect handling, custom
+  domains, and per-domain workflows.
+- Looking up a specific method or class? See the
+  [API Reference](reference/index.md).
+- Curious how the pieces fit together? Read the
+  [Architecture](architecture.md) document.
 
 ## Installation
 
@@ -70,6 +82,9 @@ Use this extension point to add a domain that HaClient does not ship
 with. Built-in domains such as `fan`, `light`, and `cover` are already
 registered at import time and cannot be replaced.
 
+Register *before* constructing the client — active domains are
+snapshotted at `HAClient` construction time.
+
 ```python
 from haclient import DomainSpec, Entity, register_domain
 
@@ -87,6 +102,11 @@ Once registered, the domain is reachable through the same accessors as
 built-ins:
 
 ```python
-sprinkler = ha.domain("sprinkler")["lawn"]
-await sprinkler.start(600)
+async with HAClient.from_url("http://localhost:8123", token="YOUR_TOKEN") as ha:
+    sprinkler = ha.domain("sprinkler")["lawn"]
+    await sprinkler.start(600)
 ```
+
+See the [Custom domains and plugins guide](guides/custom-domains.md)
+for collection-level operations, event routing, listener
+decorators, and entry-point publishing.

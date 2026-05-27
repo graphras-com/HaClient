@@ -19,6 +19,23 @@ theme:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Guides:
+      - Overview: guides/index.md
+      - Async lifecycle: guides/lifecycle.md
+      - Sync wrapper: guides/sync-wrapper.md
+      - State and value listeners: guides/listeners.md
+      - Reconnect handling: guides/reconnect.md
+      - Custom domains and plugins: guides/custom-domains.md
+      - Service routing (advanced): guides/service-routing.md
+      - Domain workflows:
+          - Light: guides/domains/light.md
+          - Switch: guides/domains/switch.md
+          - Climate: guides/domains/climate.md
+          - Cover: guides/domains/cover.md
+          - Media Player: guides/domains/media_player.md
+          - Scene: guides/domains/scene.md
+          - Timer: guides/domains/timer.md
+          - Sensor: guides/domains/sensor.md
   - API Reference:
       - Overview: reference/index.md
       - HAClient (facade): reference/api.md
