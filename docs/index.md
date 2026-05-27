@@ -45,8 +45,8 @@ async with HAClient.from_url("http://localhost:8123", token="YOUR_TOKEN") as ha:
     await light.set_brightness(200)
 
     # Generic accessor — works for any registered domain.
-    fan = ha.domain("fan")["ceiling"]
-    # await fan.set_speed(75)
+    fan = ha.fan("ceiling")
+    await fan.set_percentage(75)
 
     # Domain-level operations.
     await ha.scene.apply({"light.ceiling": {"state": "on", "brightness": 120}})
@@ -64,16 +64,27 @@ with SyncHAClient.from_url("http://localhost:8123", token="YOUR_TOKEN") as ha:
 
 ### Adding a custom domain
 
+Use this extension point to add a domain that HaClient does not ship
+with. Built-in domains such as `fan`, `light`, and `cover` are already
+registered at import time and cannot be replaced.
+
 ```python
-from haclient import register_domain, DomainSpec, Entity
+from haclient import DomainSpec, Entity, register_domain
 
-class Fan(Entity):
-    domain = "fan"
+class Sprinkler(Entity):
+    domain = "sprinkler"
 
-    async def set_speed(self, pct: int) -> None:
-        await self._call_service("set_percentage", {"percentage": pct})
+    async def start(self, duration: int) -> None:
+        # Extension implementation: call the underlying HA service directly.
+        await self._call_service("start", {"duration": duration})
 
-register_domain(DomainSpec(name="fan", entity_cls=Fan))
+register_domain(DomainSpec(name="sprinkler", entity_cls=Sprinkler))
 ```
 
-Built-in or third-party — both routes are equivalent.
+Once registered, the domain is reachable through the same accessors as
+built-ins:
+
+```python
+sprinkler = ha.domain("sprinkler")["lawn"]
+await sprinkler.start(600)
+```
