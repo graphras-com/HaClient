@@ -86,7 +86,7 @@ Create a client with `HAClient.from_url()` or by passing a `ConnectionConfig` di
 - **`token`** -- Long-lived access token generated from the Home Assistant UI
 - **`reconnect`** -- Enable automatic WebSocket reconnection (default: `True`)
 - **`ping_interval`** -- WebSocket keepalive interval in seconds (default: `30`)
-- **`request_timeout`** -- Timeout for REST and WS commands in seconds (default: `10`)
+- **`request_timeout`** -- Timeout for REST and WS commands in seconds (default: `30`)
 - **`verify_ssl`** -- Verify SSL certificates (default: `True`)
 - **`service_policy`** -- Service call routing: `"ws"`, `"rest"`, or `"auto"` (default: `"auto"`)
 
