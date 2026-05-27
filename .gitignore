@@ -217,3 +217,8 @@ __marimo__/
 
 # Sandbox / scratch scripts
 sandbox/
+
+# Generated MkDocs site and auto-generated architecture diagrams
+site/
+docs/architecture/
+
