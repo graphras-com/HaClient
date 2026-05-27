@@ -1,8 +1,8 @@
 """Configuration objects for `HAClient`.
 
-The connection settings, URL handling, and aiohttp session ownership are
-captured in `ConnectionConfig`. This isolates configuration parsing from
-the rest of the package and keeps `HAClient.__init__` boring.
+The connection settings and URL handling are captured in
+`ConnectionConfig`. This isolates configuration parsing from the rest of
+the package and keeps `HAClient.__init__` boring.
 """
 
 from __future__ import annotations
@@ -10,8 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlparse, urlunparse
-
-import aiohttp
 
 ServicePolicy = Literal["ws", "rest", "auto"]
 """How `ServiceCaller` should choose between WebSocket and REST.
@@ -126,25 +124,3 @@ class ConnectionConfig:
             verify_ssl=verify_ssl,
             service_policy=service_policy,
         )
-
-
-class SharedSession:
-    """Holder for an optional shared `aiohttp.ClientSession`.
-
-    Both REST and WebSocket adapters can use the same session instance,
-    which is the recommended pattern for users who already manage their
-    own ``aiohttp.ClientSession``. When no session is provided here, each
-    adapter creates and owns its own.
-    """
-
-    def __init__(self, session: aiohttp.ClientSession | None = None) -> None:
-        """Wrap *session* and record whether it was externally owned.
-
-        Parameters
-        ----------
-        session : aiohttp.ClientSession or None, optional
-            Pre-existing session to share between transports. ``None``
-            leaves each adapter to manage its own session.
-        """
-        self.session = session
-        self.shared = session is not None
