@@ -83,6 +83,7 @@ class AiohttpWebSocketAdapter:
 
         self._reader_task: asyncio.Task[None] | None = None
         self._keepalive_task: asyncio.Task[None] | None = None
+        self._reconnect_task: asyncio.Task[None] | None = None
         self._closing = False
         self._connected = asyncio.Event()
         self._disconnect_listeners: list[DisconnectListener] = []
@@ -151,9 +152,11 @@ class AiohttpWebSocketAdapter:
         2. Cancels and awaits the keepalive task.
         3. Closes the underlying socket and waits up to 5 seconds for
            the reader task to drain.
-        4. Fails any pending command/pong futures with
+        4. Cancels and awaits any in-flight reconnect task so a
+           background reconnect cannot survive ``close()``.
+        5. Fails any pending command/pong futures with
            `ConnectionClosedError`.
-        5. Closes the owned aiohttp session, if any.
+        6. Closes the owned aiohttp session, if any.
         """
         self._closing = True
         self._connected.clear()
@@ -170,6 +173,11 @@ class AiohttpWebSocketAdapter:
             except (TimeoutError, asyncio.CancelledError, Exception):  # noqa: BLE001
                 self._reader_task.cancel()
             self._reader_task = None
+        if self._reconnect_task is not None:
+            self._reconnect_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._reconnect_task
+            self._reconnect_task = None
         for fut in self._pending.values():
             if not fut.done():
                 fut.set_exception(ConnectionClosedError("WebSocket closed"))
@@ -396,8 +404,14 @@ class AiohttpWebSocketAdapter:
                     fut.set_exception(ConnectionClosedError("WebSocket closed"))
             self._pong_waiters.clear()
             await self._notify_disconnect()
-            if self._reconnect and not self._closing:
-                asyncio.create_task(self._reconnect_loop(), name="ha-ws-reconnect")
+            if (
+                self._reconnect
+                and not self._closing
+                and (self._reconnect_task is None or self._reconnect_task.done())
+            ):
+                self._reconnect_task = asyncio.create_task(
+                    self._reconnect_loop(), name="ha-ws-reconnect"
+                )
 
     async def _notify_disconnect(self) -> None:
         """Invoke all registered disconnect listeners."""
@@ -462,32 +476,50 @@ class AiohttpWebSocketAdapter:
             _LOGGER.exception("Event handler raised")
 
     async def _reconnect_loop(self) -> None:
-        """Re-establish the connection with exponential back-off."""
+        """Re-establish the connection with exponential back-off.
+
+        Notes
+        -----
+        Stale subscription ids from the dropped connection are dropped
+        before resubscribing so ``_subscriptions`` only ever contains
+        ids that are valid on the live session.
+        """
         delay = 1.0
         attempt = 0
-        while not self._closing:
-            attempt += 1
-            try:
-                _LOGGER.info("Reconnecting to %s (attempt %d)", self._url, attempt)
-                await self._do_connect()
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("Reconnect attempt %d failed: %s", attempt, err)
-                await asyncio.sleep(delay + random.uniform(0, 0.5))
-                delay = min(delay * 2, 60.0)
-                continue
-
-            self._reader_task = asyncio.create_task(self._reader_loop(), name="ha-ws-reader")
-            if self._ping_interval > 0:
-                self._keepalive_task = asyncio.create_task(
-                    self._keepalive_loop(), name="ha-ws-keepalive"
-                )
-            for event_type, (_old_id, handler) in list(self._event_subs.items()):
+        try:
+            while not self._closing:
+                attempt += 1
                 try:
-                    await self.subscribe_events(handler, event_type)
+                    _LOGGER.info("Reconnecting to %s (attempt %d)", self._url, attempt)
+                    await self._do_connect()
+                except asyncio.CancelledError:
+                    raise
                 except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("Failed to resubscribe to %s: %s", event_type, err)
-            await self._notify_reconnect()
-            return
+                    _LOGGER.warning("Reconnect attempt %d failed: %s", attempt, err)
+                    await asyncio.sleep(delay + random.uniform(0, 0.5))
+                    delay = min(delay * 2, 60.0)
+                    continue
+
+                self._reader_task = asyncio.create_task(self._reader_loop(), name="ha-ws-reader")
+                if self._ping_interval > 0:
+                    self._keepalive_task = asyncio.create_task(
+                        self._keepalive_loop(), name="ha-ws-keepalive"
+                    )
+                # Drop stale subscription ids tied to the previous
+                # connection before we resubscribe; ``subscribe_events``
+                # will register fresh ids on the live session.
+                stale_ids = {sid for sid, _ in self._event_subs.values()}
+                for sid in stale_ids:
+                    self._subscriptions.pop(sid, None)
+                for event_type, (_old_id, handler) in list(self._event_subs.items()):
+                    try:
+                        await self.subscribe_events(handler, event_type)
+                    except Exception as err:  # noqa: BLE001
+                        _LOGGER.warning("Failed to resubscribe to %s: %s", event_type, err)
+                await self._notify_reconnect()
+                return
+        finally:
+            self._reconnect_task = None
 
     async def ping(self, *, timeout: float | None = None) -> None:
         """Send a ``ping`` frame and wait for the matching ``pong``.

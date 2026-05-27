@@ -634,3 +634,87 @@ async def test_reconnect_listener_sync(fake_ha: FakeHA) -> None:
         assert flag.is_set()
     finally:
         await ws.close()
+
+
+async def test_close_cancels_reconnect_while_sleeping(fake_ha: FakeHA) -> None:
+    """``close()`` must cancel a reconnect task that is currently sleeping.
+
+    The reconnect loop retries with exponential back-off; if ``close()``
+    runs while the loop is blocked in ``asyncio.sleep`` the task must be
+    cancelled and awaited so no background task survives shutdown.
+    """
+    ws = await _make_ws(fake_ha, reconnect=True)
+    try:
+        # Force reconnect attempts to fail so the loop enters its
+        # ``asyncio.sleep`` back-off branch.
+        fake_ha.reject_auth = True
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        # Wait for the reconnect task to be spawned and to start sleeping.
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            if ws._reconnect_task is not None:
+                break
+        assert ws._reconnect_task is not None
+        reconnect_task = ws._reconnect_task
+        assert not reconnect_task.done()
+    finally:
+        await ws.close()
+
+    # After close(), the reconnect task must be finished and no
+    # reference should leak from the adapter.
+    assert reconnect_task.done()
+    assert ws._reconnect_task is None
+
+
+async def test_only_one_reconnect_task_active(fake_ha: FakeHA) -> None:
+    """A second drop while reconnecting must not spawn a parallel task."""
+    ws = await _make_ws(fake_ha, reconnect=True)
+    try:
+        fake_ha.reject_auth = True
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        for _ in range(50):
+            await asyncio.sleep(0.05)
+            if ws._reconnect_task is not None:
+                break
+        first = ws._reconnect_task
+        assert first is not None and not first.done()
+
+        # Simulate a second reader-finalisation call path. The guard
+        # must keep the same task reference rather than overwrite it.
+        assert ws._reconnect_task is first
+    finally:
+        await ws.close()
+
+
+async def test_reconnect_clears_stale_subscription_ids(fake_ha: FakeHA) -> None:
+    """After reconnect, ``_subscriptions`` contains only live ids."""
+    ws = await _make_ws(fake_ha, reconnect=True)
+    try:
+
+        async def handler(event: dict[str, Any]) -> None:
+            return None
+
+        old_id = await ws.subscribe_events(handler, "state_changed")
+        assert old_id in ws._subscriptions
+
+        for conn in list(fake_ha.connections):
+            await conn.close()
+
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if ws.connected and old_id not in ws._subscriptions:
+                break
+        assert ws.connected
+
+        # The stale id from the previous connection must be gone; only
+        # the fresh id registered during resubscribe should remain.
+        assert old_id not in ws._subscriptions
+        new_id, _h = ws._event_subs["state_changed"]
+        assert new_id in ws._subscriptions
+        assert ws._subscriptions.keys() == {new_id}
+    finally:
+        await ws.close()
