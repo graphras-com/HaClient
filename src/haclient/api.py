@@ -128,7 +128,8 @@ class HAClient:
         active = self._select_active_domains(domains)
         self._accessors: dict[str, DomainAccessor[Any]] = {}
         for spec in active:
-            accessor: DomainAccessor[Any] = DomainAccessor(spec, self._factory)
+            cls = spec.accessor_cls if spec.accessor_cls is not None else DomainAccessor
+            accessor: DomainAccessor[Any] = cls(spec, self._factory)
             self._accessors[spec.accessor_name()] = accessor
             self._accessors[spec.name] = accessor
             for event_type in spec.event_subscriptions:

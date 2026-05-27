@@ -8,7 +8,13 @@ A `DomainAccessor` is the object returned by ``ha.<domain>`` (e.g.
 ``ha.light`` or ``ha.scene``). It provides:
 
 * ``__call__(name)`` and ``__getitem__(name)`` for entity lookup.
-* Domain-level operations registered by the spec via ``operations``.
+* Domain-level operations registered by the spec via ``operations`` (legacy
+  third-party path) **or** via typed subclass methods (preferred path).
+
+Domains with collection-level operations should subclass `DomainAccessor`
+and register the subclass via ``DomainSpec.accessor_cls``.  This keeps the
+public API statically typed without requiring ``# type: ignore`` workarounds
+or private ``_factory`` access from outside the accessor.
 
 Third-party plugins can ship additional domains by exposing an entry
 point under the ``haclient.domains`` group; see
@@ -63,10 +69,14 @@ class DomainSpec(Generic[E]):
     on_event : callable or None
         Per-domain event handler (see `DomainEventHandler`).
     operations : dict
-        Domain-level async operations registered on the
-        `DomainAccessor`. Each value is an async callable; it will be
-        bound to the accessor so the first positional argument *is* the
-        accessor instance.
+        Legacy dynamic operation dict kept for third-party plugin
+        compatibility. Built-in domains with collection-level operations
+        should prefer ``accessor_cls`` instead.
+    accessor_cls : type[DomainAccessor] or None
+        Optional typed `DomainAccessor` subclass to instantiate for this
+        domain. When provided, the ``HAClient`` uses this class rather than
+        the base `DomainAccessor`, exposing properly typed collection-level
+        methods (e.g. ``SceneAccessor.create``).
     """
 
     name: str
@@ -75,6 +85,7 @@ class DomainSpec(Generic[E]):
     event_subscriptions: tuple[str, ...] = ()
     on_event: DomainEventHandler | None = None
     operations: dict[str, Callable[..., Any]] = field(default_factory=dict)
+    accessor_cls: type[DomainAccessor[Any]] | None = None
 
     def accessor_name(self) -> str:
         """Return the accessor attribute name (defaults to ``name``)."""
@@ -87,14 +98,14 @@ class DomainAccessor(Generic[E]):
     Returned by ``HAClient.<accessor>``. Exposes:
 
     * Lookup by short name: ``ha.light("kitchen")`` or ``ha.light["kitchen"]``.
-    * Domain-level operations registered on the spec, bound to this accessor:
-      ``await ha.scene.create("romantic", ...)``.
+    * Domain-level operations either via typed subclass methods (preferred) or
+      via legacy dynamic binding of ``spec.operations`` entries.
 
     Parameters
     ----------
     spec : DomainSpec
         The spec describing this domain.
-    factory : EntityFactory
+    factory : EntityFactoryProtocol
         Factory used to create entity instances on demand.
     """
 
@@ -103,12 +114,22 @@ class DomainAccessor(Generic[E]):
         self._factory = factory
         for op_name, op in spec.operations.items():
             # Bind each operation as an attribute on the instance.
+            # This path is kept for backward-compatible third-party plugins.
             setattr(self, op_name, self._bind(op))
 
     @property
     def spec(self) -> DomainSpec[E]:
         """Return the underlying `DomainSpec`."""
         return self._spec
+
+    @property
+    def factory(self) -> EntityFactoryProtocol:
+        """Return the `EntityFactoryProtocol` used to create entities.
+
+        Subclasses use this to access ``factory.services`` and
+        ``factory.state`` without reaching into private internals.
+        """
+        return self._factory
 
     def _bind(self, op: Callable[..., Any]) -> Callable[..., Any]:
         """Bind a domain operation to this accessor.

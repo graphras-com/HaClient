@@ -199,3 +199,74 @@ async def test_domain_accessor_spec_property() -> None:
         assert accessor.spec.name == "light"
     finally:
         await ha.close()
+
+
+async def test_domain_accessor_factory_property() -> None:
+    """``DomainAccessor.factory`` returns the EntityFactoryProtocol instance."""
+    from haclient.core.factory import EntityFactory
+
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        accessor = ha.domain("light")
+        assert isinstance(accessor.factory, EntityFactory)
+    finally:
+        await ha.close()
+
+
+async def test_scene_accessor_is_typed_subclass() -> None:
+    """``ha.scene`` returns a ``SceneAccessor`` with typed methods."""
+    from haclient.domains.scene import SceneAccessor
+
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        accessor = ha.domain("scene")
+        assert isinstance(accessor, SceneAccessor)
+        assert callable(accessor.create)
+        assert callable(accessor.apply)
+    finally:
+        await ha.close()
+
+
+async def test_timer_accessor_is_typed_subclass() -> None:
+    """``ha.timer`` returns a ``TimerAccessor`` with a typed ``create`` method."""
+    from haclient.domains.timer import TimerAccessor
+
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False)
+    try:
+        accessor = ha.domain("timer")
+        assert isinstance(accessor, TimerAccessor)
+        assert callable(accessor.create)
+    finally:
+        await ha.close()
+
+
+async def test_accessor_cls_in_spec_is_used() -> None:
+    """When ``DomainSpec.accessor_cls`` is set, it is instantiated by the client."""
+
+    class _CustomAccessor(DomainAccessor[_Custom]):
+        def special(self) -> str:
+            return "typed"
+
+    reg = DomainRegistry()
+    spec = DomainSpec(name="cls_test", entity_cls=_Custom, accessor_cls=_CustomAccessor)
+    reg.register(spec)
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False, registry=reg)
+    try:
+        accessor = ha.domain("cls_test")
+        assert isinstance(accessor, _CustomAccessor)
+        assert accessor.special() == "typed"
+    finally:
+        await ha.close()
+
+
+async def test_accessor_cls_none_falls_back_to_base() -> None:
+    """When ``DomainSpec.accessor_cls`` is ``None``, the base ``DomainAccessor`` is used."""
+    reg = DomainRegistry()
+    spec = DomainSpec(name="base_test", entity_cls=_Custom)
+    reg.register(spec)
+    ha = HAClient.from_url("http://x", token="t", load_plugins=False, registry=reg)
+    try:
+        accessor = ha.domain("base_test")
+        assert type(accessor) is DomainAccessor
+    finally:
+        await ha.close()

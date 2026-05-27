@@ -21,7 +21,6 @@ from haclient.core.plugins import DomainAccessor, DomainSpec, register_domain
 from haclient.entity.base import Entity, ValueChangeHandler
 
 if TYPE_CHECKING:
-    from haclient.core.factory import EntityFactory
     from haclient.core.services import ServiceCaller
     from haclient.core.state import StateStore
     from haclient.ports import Clock
@@ -326,69 +325,79 @@ class Timer(Entity):
             self._schedule_value(listener, self.entity_id, data)
 
 
-# -- Domain-level operations & event handler --------------------------
+# -- Typed domain accessor & event handler ----------------------------
 
 
-async def _create(
-    accessor: DomainAccessor[Timer],
-    *,
-    name: str | None = None,
-    duration: str = "00:01:00",
-    persistent: bool = False,
-) -> Timer:
-    """Create a library-managed timer helper in Home Assistant.
+class TimerAccessor(DomainAccessor[Timer]):
+    """Typed domain accessor for the ``timer`` domain.
 
-    Sends a ``timer/create`` WebSocket command and returns a `Timer`.
-
-    Parameters
-    ----------
-    accessor : DomainAccessor
-        The timer accessor (provided automatically by the binding).
-    name : str or None, optional
-        Short object-id; auto-generated when omitted (only allowed for
-        ephemeral timers).
-    duration : str, optional
-        Initial duration for the helper.
-    persistent : bool, optional
-        If ``True``, the HA helper is **not** deleted on idle.
-        Requires an explicit *name*.
-
-    Returns
-    -------
-    Timer
-        The newly created timer entity.
-
-    Raises
-    ------
-    ValueError
-        If ``persistent=True`` and *name* is ``None``.
+    Returned by ``ha.timer``. Provides a statically-typed
+    :meth:`create` method in addition to the standard entity lookup
+    methods inherited from `DomainAccessor`.
     """
-    if name is None:
-        if persistent:
-            raise ValueError("Persistent timers require an explicit name")
-        name = _generate_timer_id()
 
-    factory: EntityFactory = accessor._factory  # type: ignore[assignment]
-    services = factory.services
-    state = factory.state
-    entity_id = state.registry.resolve("timer", name)
-    existing = state.registry.get(entity_id)
-    timer: Timer
-    if existing is not None and isinstance(existing, Timer):
-        timer = existing
-        if timer._ensured:
-            return timer
-    else:
-        timer = accessor[name]
+    async def create(
+        self,
+        *,
+        name: str | None = None,
+        duration: str = "00:01:00",
+        persistent: bool = False,
+    ) -> Timer:
+        """Create a library-managed timer helper in Home Assistant.
 
-    timer._persistent = persistent
-    object_id = entity_id.split(".", 1)[1]
-    await services.ws.send_command(
-        {"type": "timer/create", "name": object_id, "duration": duration}
-    )
-    timer._ensured = True
-    timer._created_by_us = True
-    return timer
+        Sends a ``timer/create`` WebSocket command and returns a `Timer`.
+
+        Parameters
+        ----------
+        name : str or None, optional
+            Short object-id; auto-generated when omitted (only allowed for
+            ephemeral timers).
+        duration : str, optional
+            Initial duration for the helper in HA format (e.g.
+            ``"00:01:00"``).
+        persistent : bool, optional
+            If ``True``, the HA helper is **not** deleted on idle.
+            Requires an explicit *name*.
+
+        Returns
+        -------
+        Timer
+            The newly created (or already-ensured) timer entity.
+
+        Raises
+        ------
+        ValueError
+            If ``persistent=True`` and *name* is ``None``.
+        """
+        from haclient.core.factory import EntityFactory
+
+        if name is None:
+            if persistent:
+                raise ValueError("Persistent timers require an explicit name")
+            name = _generate_timer_id()
+
+        factory = self.factory
+        assert isinstance(factory, EntityFactory)
+        services = factory.services
+        state = factory.state
+        entity_id = state.registry.resolve("timer", name)
+        existing = state.registry.get(entity_id)
+        timer: Timer
+        if existing is not None and isinstance(existing, Timer):
+            timer = existing
+            if timer._ensured:
+                return timer
+        else:
+            timer = self[name]
+
+        timer._persistent = persistent
+        object_id = entity_id.split(".", 1)[1]
+        await services.ws.send_command(
+            {"type": "timer/create", "name": object_id, "duration": duration}
+        )
+        timer._ensured = True
+        timer._created_by_us = True
+        return timer
 
 
 def _on_timer_event(entity: Entity, event_type: str, data: dict[str, Any]) -> None:
@@ -407,7 +416,7 @@ SPEC: DomainSpec[Timer] = register_domain(
         entity_cls=Timer,
         event_subscriptions=("timer.finished", "timer.cancelled"),
         on_event=_on_timer_event,
-        operations={"create": _create},
+        accessor_cls=TimerAccessor,
     )
 )
 """The `DomainSpec` registered with the shared `DomainRegistry`."""
