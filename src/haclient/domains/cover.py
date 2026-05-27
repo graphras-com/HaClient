@@ -87,15 +87,57 @@ class Cover(Entity):
     # -- Actions ------------------------------------------------------
 
     async def open(self) -> None:
-        """Open the cover fully."""
+        """Open the cover fully.
+
+        Invokes the ``cover.open_cover`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("open_cover")
 
     async def close(self) -> None:
-        """Close the cover fully."""
+        """Close the cover fully.
+
+        Invokes the ``cover.close_cover`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("close_cover")
 
     async def stop(self) -> None:
-        """Stop movement of the cover."""
+        """Stop movement of the cover.
+
+        Invokes the ``cover.stop_cover`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("stop_cover")
 
     async def set_position(self, position: int) -> None:
@@ -118,7 +160,21 @@ class Cover(Entity):
         )
 
     async def toggle(self) -> None:
-        """Toggle open/close state."""
+        """Toggle open/close state.
+
+        Invokes the ``cover.toggle`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("toggle")
 
 

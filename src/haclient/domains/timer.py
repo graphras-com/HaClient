@@ -88,7 +88,18 @@ class Timer(Entity):
 
     @property
     def persistent(self) -> bool:
-        """Whether this timer keeps its HA helper after returning to idle."""
+        """Whether this timer keeps its HA helper after returning to idle.
+
+        Returns
+        -------
+        bool
+            ``True`` for timers created via `TimerAccessor.create` with
+            ``persistent=True``; ``False`` for ephemeral helpers and
+            for any timer whose helper was not created by this client.
+            Only meaningful for timers managed by this library — proxies
+            for pre-existing HA helpers default to ``False`` but are
+            never auto-deleted.
+        """
         return self._persistent
 
     # -- State properties ---------------------------------------------
@@ -110,25 +121,72 @@ class Timer(Entity):
 
     @property
     def duration(self) -> str | None:
-        """Configured duration (e.g. ``"0:05:00"``)."""
+        """Configured duration as a raw HA duration string.
+
+        Returns
+        -------
+        str or None
+            The HA ``duration`` attribute (e.g. ``"0:05:00"``), or
+            ``None`` when not reported. The string is **not** parsed
+            into a :class:`datetime.timedelta`; use `time_remaining`
+            for a numeric value.
+        """
         val = self.attributes.get("duration")
         return str(val) if val is not None else None
 
     @property
     def remaining(self) -> str | None:
-        """Time remaining (e.g. ``"0:04:30"``)."""
+        """Time remaining as a raw HA duration string.
+
+        Returns
+        -------
+        str or None
+            The HA ``remaining`` attribute (e.g. ``"0:04:30"``), or
+            ``None`` when not reported. The string is **not** parsed
+            into seconds; use `time_remaining` for a numeric value.
+        """
         val = self.attributes.get("remaining")
         return str(val) if val is not None else None
 
     @property
     def finishes_at(self) -> str | None:
-        """ISO-8601 datetime when the timer will finish, if active."""
+        """ISO-8601 datetime when the timer will finish.
+
+        Returns
+        -------
+        str or None
+            The raw HA ``finishes_at`` attribute, populated only while
+            the timer is ``active``. ``None`` for idle or paused
+            timers, and when the device does not report a finish time.
+        """
         val = self.attributes.get("finishes_at")
         return str(val) if val is not None else None
 
     @property
     def time_remaining(self) -> float | None:
-        """Live seconds remaining on the timer, computed from HA attributes."""
+        """Live seconds remaining on the timer.
+
+        Returns
+        -------
+        float or None
+            Computed live on every access:
+
+            * When the timer is ``active``, parses ``finishes_at`` as
+              an ISO-8601 datetime and returns
+              ``max(0.0, finishes_at - now_utc)``.
+            * When the timer is ``paused``, parses the ``remaining``
+              duration string.
+            * Otherwise (``idle``, unavailable, unknown) returns
+              ``None``.
+
+            ``None`` is also returned when the underlying attribute is
+            absent or malformed.
+
+        Notes
+        -----
+        The value is not cached; each call may produce a slightly
+        different result for active timers. No I/O is performed.
+        """
         if self.state == "active":
             raw = self.attributes.get("finishes_at")
             if raw is None:
@@ -203,15 +261,75 @@ class Timer(Entity):
         await self._call_service("start", data)
 
     async def pause(self) -> None:
-        """Pause the timer."""
+        """Pause the timer.
+
+        Invokes the ``timer.pause`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call (for example,
+            the timer is not currently active).
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("pause")
 
     async def cancel(self) -> None:
-        """Cancel the timer (returns to idle)."""
+        """Cancel the timer, returning it to idle.
+
+        Invokes the ``timer.cancel`` Home Assistant service.
+
+        Notes
+        -----
+        Returning to idle from a non-idle state triggers the standard
+        timer state-change listeners. For ephemeral timers created via
+        `TimerAccessor.create` with ``persistent=False`` (the default),
+        this transition also schedules an auto-cleanup that deletes the
+        HA helper, after which the entity's ``state`` is reset to
+        ``"unknown"`` and the proxy can be re-ensured by the next
+        action.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("cancel")
 
     async def finish(self) -> None:
-        """Finish the timer immediately."""
+        """Finish the timer immediately.
+
+        Invokes the ``timer.finish`` Home Assistant service. Behaves as
+        if the configured duration had elapsed: a ``timer.finished``
+        event fires and the timer returns to idle.
+
+        Notes
+        -----
+        For ephemeral timers (see `cancel`) the transition to idle
+        also schedules auto-cleanup of the HA helper.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("finish")
 
     async def change(self, *, duration: str) -> None:

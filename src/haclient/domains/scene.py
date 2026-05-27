@@ -54,13 +54,30 @@ class Scene(Entity):
 
     @property
     def name(self) -> str | None:
-        """Human-readable name of the scene."""
+        """Human-readable name of the scene.
+
+        Returns
+        -------
+        str or None
+            The HA ``friendly_name`` attribute, or ``None`` when the
+            entity does not advertise one. Note that this property
+            deliberately does not return the scene's ``entity_id``
+            or object-id slug.
+        """
         val = self.attributes.get("friendly_name")
         return str(val) if val is not None else None
 
     @property
     def icon(self) -> str | None:
-        """Icon identifier for the scene (e.g. ``"mdi:palette"``)."""
+        """Icon identifier for the scene.
+
+        Returns
+        -------
+        str or None
+            The raw HA ``icon`` attribute, typically a Material Design
+            Icons identifier of the form ``"mdi:<name>"``. ``None`` when
+            the entity does not advertise an icon.
+        """
         val = self.attributes.get("icon")
         return str(val) if val is not None else None
 
@@ -81,7 +98,31 @@ class Scene(Entity):
         await self._call_service("turn_on", data)
 
     async def delete(self) -> None:
-        """Delete this dynamically-created scene."""
+        """Delete this dynamically-created scene.
+
+        Invokes the ``scene.delete`` Home Assistant service. This is
+        only meaningful for scenes created at runtime via
+        `SceneAccessor.create`; static scenes defined in YAML cannot be
+        deleted this way and Home Assistant will surface an error.
+
+        Notes
+        -----
+        The local entity object is **not** removed from the registry by
+        this call. Callers that want to discard the proxy should also
+        drop their reference.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the call (for example, the scene
+            is YAML-defined and not deletable).
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("delete")
 
     # -- Listener decorators ------------------------------------------

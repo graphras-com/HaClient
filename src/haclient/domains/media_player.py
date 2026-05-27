@@ -188,7 +188,23 @@ class FavoriteItem:
         self._player = player
 
     async def play(self) -> None:
-        """Play this favorite on its `MediaPlayer`."""
+        """Play this favorite on its `MediaPlayer`.
+
+        Delegates to `MediaPlayer.play_media` with the captured
+        ``media_content_type`` and ``media_content_id``, which invokes
+        the ``media_player.play_media`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._player.play_media(self.media_content_type, self.media_content_id)
 
     def __repr__(self) -> str:
@@ -389,33 +405,144 @@ class MediaPlayer(Entity):
 
     @property
     def now_playing(self) -> NowPlaying:
-        """Structured snapshot of the currently playing media."""
+        """Structured snapshot of the currently playing media.
+
+        Returns
+        -------
+        NowPlaying
+            A fresh, frozen snapshot built from the entity's current
+            attributes. The ``entity_picture`` field is resolved against
+            the REST `base_url` so consumers receive an absolute URL.
+            Two snapshots can be compared with ``==`` to detect whether
+            the playing media actually changed.
+
+        Notes
+        -----
+        Every access constructs a new dataclass; no caching or I/O is
+        performed. The result is independent of any subsequent state
+        update, so it is safe to retain across event-loop turns.
+        """
         return _now_playing_from_attrs(self.attributes, self._services.rest.base_url)
 
     # -- Actions ------------------------------------------------------
 
     async def play(self) -> None:
-        """Resume / start playback."""
+        """Resume / start playback.
+
+        Invokes the ``media_player.media_play`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call (for example, no
+            media is loaded).
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_play")
 
     async def pause(self) -> None:
-        """Pause playback."""
+        """Pause playback.
+
+        Invokes the ``media_player.media_pause`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_pause")
 
     async def play_pause(self) -> None:
-        """Toggle play/pause."""
+        """Toggle play/pause.
+
+        Invokes the ``media_player.media_play_pause`` Home Assistant
+        service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_play_pause")
 
     async def stop(self) -> None:
-        """Stop playback."""
+        """Stop playback.
+
+        Invokes the ``media_player.media_stop`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_stop")
 
     async def next(self) -> None:
-        """Skip to the next track."""
+        """Skip to the next track.
+
+        Invokes the ``media_player.media_next_track`` Home Assistant
+        service. This method does **not** consult
+        `NowPlaying.next`; calls to players that do not advertise
+        skip-next support will surface as `CommandError`. Pre-check
+        ``self.now_playing.next`` to avoid that.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call (e.g. the player
+            does not support skip-next).
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_next_track")
 
     async def previous(self) -> None:
-        """Skip to the previous track."""
+        """Skip to the previous track.
+
+        Invokes the ``media_player.media_previous_track`` Home Assistant
+        service. This method does **not** consult
+        `NowPlaying.previous`; calls to players that do not advertise
+        skip-previous support will surface as `CommandError`. Pre-check
+        ``self.now_playing.previous`` to avoid that.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("media_previous_track")
 
     async def set_volume(self, level: float) -> None:
@@ -446,11 +573,39 @@ class MediaPlayer(Entity):
         await self._call_service("volume_mute", {"is_volume_muted": bool(muted)})
 
     async def power_on(self) -> None:
-        """Power the media player on."""
+        """Power the media player on.
+
+        Invokes the ``media_player.turn_on`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_on")
 
     async def power_off(self) -> None:
-        """Power the media player off."""
+        """Power the media player off.
+
+        Invokes the ``media_player.turn_off`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_off")
 
     async def select_source(self, source: str) -> None:
