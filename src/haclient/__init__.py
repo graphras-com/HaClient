@@ -71,6 +71,9 @@ __all__ = [
 ]
 
 try:
-    __version__ = _pkg_version("haclient")
-except PackageNotFoundError:  # pragma: no cover - only hit when package not installed
-    __version__ = "0.0.0+unknown"
+    from haclient._version import __version__
+except ImportError:  # pragma: no cover - fallback when _version.py is absent (editable/source)
+    try:
+        __version__ = _pkg_version("haclient")
+    except PackageNotFoundError:  # pragma: no cover - only hit when package not installed
+        __version__ = "0.0.0+unknown"
