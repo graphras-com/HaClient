@@ -11,8 +11,10 @@ WebSocket support.
   ship via the `haclient.domains` entry-point group.
 - Async context manager with automatic WebSocket connect, race-free
   state priming, and reconnect-aware refresh.
-- Typed domain accessors: `light`, `switch`, `climate`, `cover`,
-  `sensor`, `binary_sensor`, `media_player`, `scene`, `timer`.
+- Typed domain accessors: `air_quality`, `binary_sensor`, `climate`,
+  `cover`, `event`, `fan`, `humidifier`, `light`, `lock`,
+  `media_player`, `scene`, `sensor`, `switch`, `timer`, `vacuum`,
+  `valve`.
 - Real-time state-change listeners with attribute and transition
   filtering.
 - Synchronous blocking wrapper for scripts, REPL, and Jupyter.

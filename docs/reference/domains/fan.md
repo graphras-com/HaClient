@@ -1,0 +1,3 @@
+# Fan
+
+::: haclient.domains.fan

@@ -1,0 +1,3 @@
+# Event
+
+::: haclient.domains.event
