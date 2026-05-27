@@ -149,11 +149,39 @@ class Valve(Entity):
     # -- Actions ------------------------------------------------------
 
     async def open(self) -> None:
-        """Open the valve fully."""
+        """Open the valve fully.
+
+        Invokes the ``valve.open_valve`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("open_valve")
 
     async def close(self) -> None:
-        """Close the valve fully."""
+        """Close the valve fully.
+
+        Invokes the ``valve.close_valve`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("close_valve")
 
     async def stop(self) -> None:
@@ -204,7 +232,21 @@ class Valve(Entity):
         await self._call_service("set_valve_position", {"position": value})
 
     async def toggle(self) -> None:
-        """Toggle open/close state."""
+        """Toggle open/close state.
+
+        Invokes the ``valve.toggle`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("toggle")
 
 

@@ -134,15 +134,57 @@ class Humidifier(Entity):
     # -- Actions ------------------------------------------------------
 
     async def on(self) -> None:
-        """Activate the humidifier."""
+        """Activate the humidifier.
+
+        Invokes the ``humidifier.turn_on`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_on")
 
     async def off(self) -> None:
-        """Deactivate the humidifier."""
+        """Deactivate the humidifier.
+
+        Invokes the ``humidifier.turn_off`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_off")
 
     async def toggle(self) -> None:
-        """Toggle the humidifier state."""
+        """Toggle the humidifier state.
+
+        Invokes the ``humidifier.toggle`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("toggle")
 
     async def set_humidity(self, humidity: int) -> None:

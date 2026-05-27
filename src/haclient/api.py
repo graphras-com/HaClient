@@ -263,7 +263,30 @@ class HAClient:
     # -- Lifecycle ----------------------------------------------------
 
     async def __aenter__(self) -> HAClient:
-        """Enter the async context manager by calling `connect`."""
+        """Enter the async context manager.
+
+        Calls `connect` to open the WebSocket, authenticate, and prime
+        the state cache. Any exception raised during connect propagates
+        to the caller; in that case the partially-initialised client is
+        not entered and `__aexit__` will not run, so callers that pre-
+        construct the client should still call `close` on failure.
+
+        Returns
+        -------
+        HAClient
+            ``self``, fully connected and ready for use.
+
+        Raises
+        ------
+        AuthenticationError
+            If the provided token is rejected by Home Assistant.
+        ConnectionClosedError
+            If the WebSocket disconnects before the handshake completes.
+        TimeoutError
+            If the initial connect or state-priming request times out.
+        HTTPError
+            If the initial REST ``get_states`` call returns an error.
+        """
         await self.connect()
         return self
 
@@ -273,56 +296,176 @@ class HAClient:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        """Exit the async context manager by calling `close`."""
+        """Exit the async context manager and release all resources.
+
+        Delegates to `close`, which shuts down the WebSocket and REST
+        adapters. Exceptions raised from the ``with`` block are **not**
+        suppressed (the method always returns ``None``); any errors
+        raised by `close` itself surface to the caller.
+
+        Parameters
+        ----------
+        exc_type : type of BaseException or None
+            Exception class raised inside the ``async with`` block, if
+            any.
+        exc : BaseException or None
+            Exception instance, if any.
+        tb : TracebackType or None
+            Associated traceback, if any.
+
+        Notes
+        -----
+        Registered ``on_disconnect`` listeners run as part of the close
+        sequence.
+        """
         await self.close()
 
     async def connect(self) -> None:
-        """Open the WebSocket and prime the state cache."""
+        """Open the WebSocket, authenticate, and prime the state cache.
+
+        Side effects:
+
+        * Opens the WebSocket and performs the auth handshake.
+        * Issues an initial REST ``get_states`` request and seeds the
+          `StateStore`.
+        * Subscribes to ``state_changed`` events so the cache stays
+          live.
+        * Starts background reconnect/keepalive tasks (when reconnect
+          is enabled in the `ConnectionConfig`).
+
+        Raises
+        ------
+        AuthenticationError
+            If the provided token is rejected.
+        ConnectionClosedError
+            If the WebSocket disconnects before the handshake completes.
+        TimeoutError
+            If a transport operation exceeds ``request_timeout``.
+        HTTPError
+            If the initial REST ``get_states`` call returns an error.
+
+        Notes
+        -----
+        Calling `connect` while already connected is a no-op handled by
+        the underlying `Connection`.
+        """
         await self._connection.open()
 
     async def close(self) -> None:
-        """Close all transports."""
+        """Close all transports and stop background tasks.
+
+        Closes the WebSocket (cancelling reconnect/keepalive tasks and
+        firing registered ``on_disconnect`` listeners) and the REST
+        adapter (releasing the owned aiohttp session, if any). An
+        externally-supplied session is not closed.
+
+        Notes
+        -----
+        Safe to call multiple times; subsequent calls are no-ops.
+        Errors during shutdown propagate to the caller.
+        """
         await self._connection.close()
 
     # -- Public service surface --------------------------------------
 
     @property
     def config(self) -> ConnectionConfig:
-        """Return the resolved connection settings."""
+        """Resolved connection settings.
+
+        Returns
+        -------
+        ConnectionConfig
+            The frozen settings object built at construction time
+            (URLs, token, timeouts, TLS, reconnect, service policy).
+        """
         return self._config
 
     @property
     def base_url(self) -> str:
-        """Return the configured Home Assistant base URL."""
+        """Configured Home Assistant base URL.
+
+        Returns
+        -------
+        str
+            The REST base URL (e.g. ``"https://homeassistant.local:8123"``).
+        """
         return self._config.base_url
 
     @property
     def connection(self) -> Connection:
-        """Return the `Connection` lifecycle service."""
+        """The `Connection` lifecycle service.
+
+        Returns
+        -------
+        Connection
+            Owns the open/close lifecycle, dispatches disconnect and
+            reconnect listeners, and re-primes the state cache after
+            each successful reconnect.
+        """
         return self._connection
 
     @property
     def events(self) -> EventBus:
-        """Return the `EventBus`."""
+        """The shared `EventBus` for Home Assistant events.
+
+        Returns
+        -------
+        EventBus
+            User-facing pub/sub façade. Subscriptions take effect
+            immediately and survive WebSocket reconnects transparently.
+        """
         return self._events
 
     @property
     def services(self) -> ServiceCaller:
-        """Return the `ServiceCaller`."""
+        """The shared `ServiceCaller`.
+
+        Returns
+        -------
+        ServiceCaller
+            Routes raw service calls over REST or WebSocket according
+            to the configured `ServicePolicy`. Domain entity actions
+            ultimately call through this object.
+        """
         return self._services
 
     @property
     def state(self) -> StateStore:
-        """Return the `StateStore`."""
+        """The shared `StateStore`.
+
+        Returns
+        -------
+        StateStore
+            Owns the live entity cache, exposes the entity registry
+            used by domain accessors, and dispatches per-entity
+            listeners on every ``state_changed`` event.
+        """
         return self._state
 
     @property
     def domains(self) -> DomainRegistry:
-        """Return the active `DomainRegistry`."""
+        """Active `DomainRegistry` for this client.
+
+        Returns
+        -------
+        DomainRegistry
+            Registry of built-in and plugin-discovered `DomainSpec`
+            entries. Unless an explicit registry was passed at
+            construction, this is the process-wide shared instance —
+            mutating it affects every client that shares it.
+        """
         return self._registry
 
     def loop(self) -> asyncio.AbstractEventLoop | None:
-        """Return the running asyncio loop, if any."""
+        """Return the running asyncio loop, if any.
+
+        Returns
+        -------
+        asyncio.AbstractEventLoop or None
+            The most recently observed running loop, or ``None`` when
+            called outside any running loop and no loop has been
+            captured yet.
+        """
         return self._clock.loop()
 
     def on_disconnect(

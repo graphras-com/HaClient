@@ -138,7 +138,16 @@ class Light(Entity):
 
     @property
     def rgb_color(self) -> tuple[int, int, int] | None:
-        """Current RGB color tuple, or ``None``."""
+        """Current RGB color tuple.
+
+        Returns
+        -------
+        tuple of int or None
+            Three-tuple ``(r, g, b)`` with each component coerced to
+            ``int`` in the range 0--255. ``None`` when the underlying
+            ``rgb_color`` attribute is missing or is not a 3-element
+            sequence.
+        """
         value = self.attributes.get("rgb_color")
         if isinstance(value, (list, tuple)) and len(value) == 3:
             return (int(value[0]), int(value[1]), int(value[2]))
@@ -176,6 +185,21 @@ class Light(Entity):
             Target color temperature in Kelvin.
         transition : float or None, optional
             Seconds for the transition. Forwarded to HA when set.
+
+        Raises
+        ------
+        TypeError
+            If *kelvin* cannot be coerced to ``int``.
+        ValueError
+            If *kelvin* cannot be coerced to ``int`` (e.g. a non-numeric
+            string).
+
+        Notes
+        -----
+        The value is forwarded to Home Assistant verbatim; this method
+        does **not** clamp against `min_kelvin` / `max_kelvin`. Values
+        outside the device's supported range will surface as
+        `CommandError` from Home Assistant.
         """
         data: dict[str, Any] = {"color_temp_kelvin": int(kelvin)}
         if transition is not None:

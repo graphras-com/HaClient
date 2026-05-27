@@ -200,15 +200,58 @@ class Fan(Entity):
     # -- Actions ------------------------------------------------------
 
     async def on(self) -> None:
-        """Turn the fan on."""
+        """Turn the fan on.
+
+        Invokes the ``fan.turn_on`` Home Assistant service. No feature
+        check is performed.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_on")
 
     async def off(self) -> None:
-        """Turn the fan off."""
+        """Turn the fan off.
+
+        Invokes the ``fan.turn_off`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_off")
 
     async def toggle(self) -> None:
-        """Toggle the fan state."""
+        """Toggle the fan state.
+
+        Invokes the ``fan.toggle`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("toggle")
 
     async def set_percentage(self, percentage: int) -> None:

@@ -127,11 +127,41 @@ class Lock(Entity):
     # -- Actions ------------------------------------------------------
 
     async def lock(self) -> None:
-        """Engage the lock."""
+        """Engage the lock.
+
+        Invokes the ``lock.lock`` Home Assistant service. No feature
+        check is performed: all locks are expected to support locking.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("lock")
 
     async def unlock(self) -> None:
-        """Release the lock."""
+        """Release the lock.
+
+        Invokes the ``lock.unlock`` Home Assistant service. No feature
+        check is performed: all locks are expected to support unlocking.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("unlock")
 
     async def open(self) -> None:

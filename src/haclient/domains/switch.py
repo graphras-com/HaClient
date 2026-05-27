@@ -54,21 +54,72 @@ class Switch(Entity):
 
     @property
     def is_on(self) -> bool:
-        """Whether the switch is currently on."""
+        """Whether the switch is currently on.
+
+        Returns
+        -------
+        bool
+            ``True`` when the cached entity ``state`` is exactly
+            ``"on"``; ``False`` for ``"off"`` and any unknown,
+            unavailable, or transitional value.
+        """
         return self.state == "on"
 
     # -- Actions ------------------------------------------------------
 
     async def on(self) -> None:
-        """Activate the switch."""
+        """Activate the switch.
+
+        Invokes the ``switch.turn_on`` Home Assistant service via the
+        configured routing policy (REST or WebSocket).
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call (WebSocket path).
+        HTTPError
+            If the REST call returns a non-2xx response (REST path).
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_on")
 
     async def off(self) -> None:
-        """Deactivate the switch."""
+        """Deactivate the switch.
+
+        Invokes the ``switch.turn_off`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("turn_off")
 
     async def toggle(self) -> None:
-        """Toggle the switch state."""
+        """Toggle the switch state.
+
+        Invokes the ``switch.toggle`` Home Assistant service.
+
+        Raises
+        ------
+        CommandError
+            If Home Assistant rejects the service call.
+        HTTPError
+            If the REST call returns a non-2xx response.
+        TimeoutError
+            If the call exceeds the configured request timeout.
+        ConnectionClosedError
+            If the WebSocket disconnects mid-call.
+        """
         await self._call_service("toggle")
 
 
