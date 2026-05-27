@@ -50,6 +50,9 @@ nav:
           - Scene: reference/domains/scene.md
           - Timer: reference/domains/timer.md
 
+hooks:
+  - tools/mkdocs_hooks.py
+
 plugins:
   - search
   - mkdocstrings:
