@@ -839,3 +839,154 @@ async def test_timer_on_finished_does_not_fire_on_cancel(client: HAClient, fake_
     await asyncio.sleep(0.05)
     assert finished == []
     assert len(cancelled) == 1
+
+
+# ---------------------------------------------------------------------------
+# Listener-callback contract regression tests (issue #72).
+#
+# All ``on_*`` listener decorators across every domain dispatch callbacks
+# with ``(old, new)``. These tests pin that contract by exercising one
+# representative listener of each shape (attribute, state-transition,
+# state-value, media-change, timer-event) and by verifying that a
+# zero-argument callback — previously implied by some docstrings — is
+# rejected by Python at call time, with the error logged and swallowed
+# so other handlers continue to run.
+# ---------------------------------------------------------------------------
+
+
+async def test_state_transition_callback_receives_old_and_new(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """``on_turn_on``-style transition callbacks get ``(old_state, new_state)``."""
+    light = client.light("kitchen")
+    received: list[tuple[Any, Any]] = []
+
+    @light.on_turn_on
+    def handler(old: Any, new: Any) -> None:
+        received.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "light.kitchen",
+        {"state": "on", "attributes": {}},
+        {"state": "off", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert received == [("off", "on")]
+
+
+async def test_attr_change_callback_receives_old_and_new(client: HAClient, fake_ha: FakeHA) -> None:
+    """``on_brightness_change``-style callbacks get ``(old_value, new_value)``."""
+    light = client.light("kitchen")
+    received: list[tuple[Any, Any]] = []
+
+    @light.on_brightness_change
+    def handler(old: Any, new: Any) -> None:
+        received.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "light.kitchen",
+        {"state": "on", "attributes": {"brightness": 200}},
+        {"state": "on", "attributes": {"brightness": 100}},
+    )
+    await asyncio.sleep(0.05)
+    assert received == [(100, 200)]
+
+
+async def test_state_value_callback_receives_old_and_new(client: HAClient, fake_ha: FakeHA) -> None:
+    """``on_value_change``-style callbacks get ``(old_state, new_state)``."""
+    sensor = client.sensor("temperature")
+    received: list[tuple[Any, Any]] = []
+
+    @sensor.on_value_change
+    def handler(old: Any, new: Any) -> None:
+        received.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "sensor.temperature",
+        {"state": "22.0", "attributes": {}},
+        {"state": "21.5", "attributes": {}},
+    )
+    await asyncio.sleep(0.05)
+    assert received == [("21.5", "22.0")]
+
+
+async def test_zero_argument_callback_is_logged_and_skipped(
+    client: HAClient, fake_ha: FakeHA, caplog: Any
+) -> None:
+    """Zero-argument callbacks (previously documented but unsupported)
+    raise ``TypeError`` at dispatch time, are logged, and do not break
+    other handlers registered for the same event.
+
+    This pins the runtime contract: every public ``on_*`` listener
+    decorator forwards ``(old, new)``. Users registering anything with
+    fewer than two positional parameters will see a logged error rather
+    than a silent no-op-shaped success.
+    """
+    light = client.light("kitchen")
+    good: list[tuple[Any, Any]] = []
+
+    @light.on_turn_on
+    def zero_arg_handler() -> None:  # type: ignore[misc]
+        # Intentionally wrong arity to verify behavior on misuse.
+        pass
+
+    @light.on_turn_on
+    def good_handler(old: Any, new: Any) -> None:
+        good.append((old, new))
+
+    with caplog.at_level("ERROR", logger="haclient.entity.base"):
+        await fake_ha.push_state_changed(
+            "light.kitchen",
+            {"state": "on", "attributes": {}},
+            {"state": "off", "attributes": {}},
+        )
+        await asyncio.sleep(0.05)
+
+    assert good == [("off", "on")]
+    # The bad handler raised TypeError when called with two args.
+    assert any(
+        record.levelname == "ERROR" and "Value change handler raised" in record.message
+        for record in caplog.records
+    )
+
+
+async def test_media_change_callback_receives_old_and_new(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """``MediaPlayer.on_media_change`` callbacks get ``(old, new)`` NowPlaying."""
+    player = client.media_player("living_room")
+    received: list[tuple[NowPlaying, NowPlaying]] = []
+
+    @player.on_media_change
+    def handler(old: NowPlaying, new: NowPlaying) -> None:
+        received.append((old, new))
+
+    await fake_ha.push_state_changed(
+        "media_player.living_room",
+        {"state": "playing", "attributes": {"media_title": "New"}},
+        {"state": "playing", "attributes": {"media_title": "Old"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(received) == 1
+    assert received[0][0].title == "Old"
+    assert received[0][1].title == "New"
+
+
+async def test_timer_event_callback_receives_entity_id_and_data(
+    client: HAClient, fake_ha: FakeHA
+) -> None:
+    """``Timer.on_finished``/``on_cancelled`` callbacks get ``(entity_id, data)``."""
+    t = client.timer("my_timer")
+    received: list[tuple[Any, Any]] = []
+
+    @t.on_finished
+    def handler(entity_id: Any, data: Any) -> None:
+        received.append((entity_id, data))
+
+    await fake_ha.push_event(
+        "timer.finished",
+        {"data": {"entity_id": "timer.my_timer"}},
+    )
+    await asyncio.sleep(0.05)
+    assert len(received) == 1
+    assert received[0][0] == "timer.my_timer"

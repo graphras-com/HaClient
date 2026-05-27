@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,14 +59,14 @@ class Vacuum(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_start(self, func: Any) -> Any:
+    def on_start(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the vacuum starts cleaning.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``cleaning`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``cleaning`` state.
 
         Returns
         -------
@@ -75,14 +75,14 @@ class Vacuum(Entity):
         """
         return self._register_state_transition_listener(_STATE_CLEANING, func)
 
-    def on_dock(self, func: Any) -> Any:
+    def on_dock(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the vacuum returns to the dock.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``docked`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``docked`` state.
 
         Returns
         -------
@@ -91,14 +91,14 @@ class Vacuum(Entity):
         """
         return self._register_state_transition_listener(_STATE_DOCKED, func)
 
-    def on_error(self, func: Any) -> Any:
+    def on_error(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the vacuum enters the error state.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``error`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``error`` state.
 
         Returns
         -------
@@ -107,13 +107,14 @@ class Vacuum(Entity):
         """
         return self._register_state_transition_listener(_STATE_ERROR, func)
 
-    def on_battery_change(self, func: Any) -> Any:
+    def on_battery_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for battery level changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``battery_level`` value (0--100).
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``battery_level`` attribute (0-100) changes.
 
         Returns
         -------
@@ -122,13 +123,14 @@ class Vacuum(Entity):
         """
         return self._register_attr_listener("battery_level", func)
 
-    def on_fan_speed_change(self, func: Any) -> Any:
+    def on_fan_speed_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for fan-speed changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``fan_speed`` value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``fan_speed`` attribute changes.
 
         Returns
         -------

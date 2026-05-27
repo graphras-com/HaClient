@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Climate(Entity):
@@ -19,13 +19,14 @@ class Climate(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_hvac_mode_change(self, func: Any) -> Any:
+    def on_hvac_mode_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for HVAC mode changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new HVAC mode string (e.g. ``"heat"``).
+            Sync or async callable invoked with ``(old_state, new_state)``
+            HVAC mode strings (e.g. ``("cool", "heat")``).
 
         Returns
         -------
@@ -34,13 +35,14 @@ class Climate(Entity):
         """
         return self._register_state_value_listener(func)
 
-    def on_temperature_change(self, func: Any) -> Any:
+    def on_temperature_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for current temperature changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``current_temperature`` value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``current_temperature`` attribute changes.
 
         Returns
         -------
@@ -49,13 +51,14 @@ class Climate(Entity):
         """
         return self._register_attr_listener("current_temperature", func)
 
-    def on_target_temperature_change(self, func: Any) -> Any:
+    def on_target_temperature_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for target temperature changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new target temperature value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``temperature`` (target temperature) attribute changes.
 
         Returns
         -------

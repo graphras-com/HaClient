@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Light(Entity):
@@ -23,14 +23,14 @@ class Light(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_turn_on(self, func: Any) -> Any:
+    def on_turn_on(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the light turns on.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``on`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``on`` state.
 
         Returns
         -------
@@ -39,14 +39,14 @@ class Light(Entity):
         """
         return self._register_state_transition_listener("on", func)
 
-    def on_turn_off(self, func: Any) -> Any:
+    def on_turn_off(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the light turns off.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``off`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``off`` state.
 
         Returns
         -------
@@ -55,13 +55,14 @@ class Light(Entity):
         """
         return self._register_state_transition_listener("off", func)
 
-    def on_brightness_change(self, func: Any) -> Any:
+    def on_brightness_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for brightness changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new brightness value (0-255).
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``brightness`` attribute (0-255) changes.
 
         Returns
         -------
@@ -70,14 +71,15 @@ class Light(Entity):
         """
         return self._register_attr_listener("brightness", func)
 
-    def on_color_change(self, func: Any) -> Any:
+    def on_color_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for RGB color changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``rgb_color`` value as reported
-            by Home Assistant.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``rgb_color`` attribute reported by Home Assistant
+            changes.
 
         Returns
         -------
@@ -86,13 +88,14 @@ class Light(Entity):
         """
         return self._register_attr_listener("rgb_color", func)
 
-    def on_kelvin_change(self, func: Any) -> Any:
+    def on_kelvin_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for color temperature (Kelvin) changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``color_temp_kelvin`` value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``color_temp_kelvin`` attribute changes.
 
         Returns
         -------

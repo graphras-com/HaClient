@@ -23,7 +23,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from haclient.core.plugins import DomainAccessor, DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 if TYPE_CHECKING:
     from haclient.core.factory import EntityFactory
@@ -90,14 +90,15 @@ class Scene(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_activate(self, func: Any) -> Any:
+    def on_activate(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener that fires when the scene is activated.
 
         Parameters
         ----------
         func : callable
-            Sync or async callable receiving the new ``state`` value
-            (the ISO-8601 activation timestamp).
+            Sync or async callable invoked with ``(old_state, new_state)``
+            ISO-8601 activation-timestamp strings whenever the scene is
+            re-activated.
 
         Returns
         -------

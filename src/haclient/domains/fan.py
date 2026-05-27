@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ class Fan(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_turn_on(self, func: Any) -> Any:
+    def on_turn_on(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the fan turns on.
 
         Parameters
@@ -60,7 +59,7 @@ class Fan(Entity):
         """
         return self._register_state_transition_listener("on", func)
 
-    def on_turn_off(self, func: Any) -> Any:
+    def on_turn_off(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the fan turns off.
 
         Parameters
@@ -76,7 +75,7 @@ class Fan(Entity):
         """
         return self._register_state_transition_listener("off", func)
 
-    def on_speed_change(self, func: Any) -> Any:
+    def on_speed_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for fan speed (``percentage``) changes.
 
         Parameters
@@ -92,7 +91,7 @@ class Fan(Entity):
         """
         return self._register_attr_listener("percentage", func)
 
-    def on_direction_change(self, func: Any) -> Any:
+    def on_direction_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for fan direction changes.
 
         Parameters
