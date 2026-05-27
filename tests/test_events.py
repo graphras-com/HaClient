@@ -183,14 +183,206 @@ async def test_double_start_is_noop() -> None:
     assert len(ws.subscriptions) == 1
 
 
-async def test_subscribe_failure_logged_not_propagated() -> None:
+async def test_subscribe_failure_during_start_is_recorded() -> None:
+    """Pre-start subscriptions failing during `start` must be observable.
+
+    The historical contract is that `start` does not raise so a single
+    flaky event type cannot abort the whole client. The new contract is
+    that the failure is recorded on the bus so callers can inspect it.
+    """
     ws = _FakeWS()
     ws.subscribe_failure = RuntimeError("boom")
     bus = EventBus(ws)  # type: ignore[arg-type]
     bus.subscribe("ev", lambda e: None)
-    await bus.start()
+    await bus.start()  # must not raise
     # No id recorded because the WS subscribe raised.
     assert ws.subscriptions == {}
+    failure = bus.subscription_failure("ev")
+    assert isinstance(failure, RuntimeError)
+    assert str(failure) == "boom"
+
+
+async def test_subscribe_post_start_failure_is_observable() -> None:
+    """A post-start `subscribe` that fails must surface via the API."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.start()
+    ws.subscribe_failure = RuntimeError("nope")
+    bus.subscribe("ev", lambda e: None)
+    pending = bus.pending_subscription("ev")
+    assert pending is not None
+    # The task completes with the transport error and the failure is
+    # exposed via `subscription_failure`.
+    with pytest.raises(RuntimeError, match="nope"):
+        await pending
+    failure = bus.subscription_failure("ev")
+    assert isinstance(failure, RuntimeError)
+    assert ws.subscriptions == {}
+
+
+async def test_subscribe_post_start_recovers_on_retry() -> None:
+    """A successful subsequent attempt clears the recorded failure."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.start()
+    ws.subscribe_failure = RuntimeError("transient")
+
+    def handler(_e: dict[str, Any]) -> None:
+        return None
+
+    bus.subscribe("ev", handler)
+    pending = bus.pending_subscription("ev")
+    assert pending is not None
+    with pytest.raises(RuntimeError):
+        await pending
+    assert bus.subscription_failure("ev") is not None
+
+    # Drop and retry with the transport healthy.
+    bus.unsubscribe("ev", handler)
+    ws.subscribe_failure = None
+    bus.subscribe("ev", handler)
+    retry = bus.pending_subscription("ev")
+    assert retry is not None
+    await retry
+    assert bus.subscription_failure("ev") is None
+    assert len(ws.subscriptions) == 1
+
+
+async def test_subscribe_async_propagates_failure_and_rolls_back() -> None:
+    """`subscribe_async` raises and leaves no dangling handler."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.start()
+    ws.subscribe_failure = RuntimeError("denied")
+
+    def handler(_e: dict[str, Any]) -> None:
+        return None
+
+    with pytest.raises(RuntimeError, match="denied"):
+        await bus.subscribe_async("ev", handler)
+
+    # Handler must NOT remain registered after a failed first subscribe,
+    # otherwise the caller's view diverges from the transport state.
+    assert ws.subscriptions == {}
+    ws.subscribe_failure = None
+    # A subsequent subscribe is treated as a fresh "first handler" and
+    # actually performs the WS call.
+    await bus.subscribe_async("ev", handler)
+    assert len(ws.subscriptions) == 1
+
+
+async def test_subscribe_async_before_start_is_batched() -> None:
+    """`subscribe_async` registered before `start` does not hit the WS."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.subscribe_async("ev", lambda _e: None)
+    assert ws.subscriptions == {}
+    await bus.start()
+    assert len(ws.subscriptions) == 1
+
+
+async def test_subscribe_async_additional_handler_skips_ws_call() -> None:
+    """Adding a second handler for an event type re-uses the subscription."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.start()
+    await bus.subscribe_async("ev", lambda _e: None)
+    assert len(ws.subscriptions) == 1
+    # A second handler must succeed without raising even if a fresh
+    # subscribe would now fail; it should not call the WS at all.
+    ws.subscribe_failure = RuntimeError("would fail if called")
+    await bus.subscribe_async("ev", lambda _e: None)
+    assert len(ws.subscriptions) == 1
+
+
+async def test_unsubscribe_async_propagates_transport_errors() -> None:
+    """`unsubscribe_async` raises if the WS rejects the call."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+
+    def handler(_e: dict[str, Any]) -> None:
+        return None
+
+    bus.subscribe("ev", handler)
+    await bus.start()
+
+    original = ws.unsubscribe
+
+    async def failing_unsubscribe(sub_id: int) -> None:
+        raise RuntimeError("nope")
+
+    ws.unsubscribe = failing_unsubscribe  # type: ignore[method-assign]
+    try:
+        with pytest.raises(RuntimeError, match="nope"):
+            await bus.unsubscribe_async("ev", handler)
+    finally:
+        ws.unsubscribe = original  # type: ignore[method-assign]
+
+
+async def test_unsubscribe_async_unknown_handler_is_noop() -> None:
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    await bus.unsubscribe_async("ev", lambda _e: None)  # never registered
+    bus.subscribe("ev", lambda _e: None)
+    await bus.unsubscribe_async("ev", lambda _e: None)  # different instance
+
+
+async def test_pending_subscription_none_when_idle() -> None:
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+    assert bus.pending_subscription("ev") is None
+    bus.subscribe("ev", lambda _e: None)
+    await bus.start()
+    # Subscribe was done synchronously inside start(), no pending task.
+    assert bus.pending_subscription("ev") is None
+
+
+async def test_unsubscribe_async_does_not_release_ws_when_handlers_remain() -> None:
+    """Removing one of several handlers must not tear down the WS subscription."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+
+    def h1(_e: dict[str, Any]) -> None:
+        return None
+
+    def h2(_e: dict[str, Any]) -> None:
+        return None
+
+    bus.subscribe("ev", h1)
+    bus.subscribe("ev", h2)
+    await bus.start()
+    await bus.unsubscribe_async("ev", h1)
+    assert ws.unsubscribed == []  # WS subscription still active for h2
+    assert len(ws.subscriptions) == 1
+
+
+async def test_cancelled_subscription_task_clears_pending() -> None:
+    """A cancelled post-start subscribe task is forgotten cleanly."""
+    ws = _FakeWS()
+    bus = EventBus(ws)  # type: ignore[arg-type]
+
+    # Slow down the WS so we can cancel the in-flight task.
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_subscribe(handler: Any, event_type: str | None = None) -> int:
+        started.set()
+        await release.wait()
+        return 1
+
+    ws.subscribe_events = slow_subscribe  # type: ignore[method-assign]
+    await bus.start()
+    bus.subscribe("ev", lambda _e: None)
+    task = bus.pending_subscription("ev")
+    assert task is not None
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    # No failure recorded for a cancellation; the slot is cleared.
+    assert bus.subscription_failure("ev") is None
+    assert bus.pending_subscription("ev") is None
+    release.set()
 
 
 async def test_install_reconnect_hook_invokes_callback() -> None:
