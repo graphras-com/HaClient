@@ -222,3 +222,6 @@ sandbox/
 site/
 docs/architecture/
 
+
+# hatch-vcs generated
+src/haclient/_version.py
