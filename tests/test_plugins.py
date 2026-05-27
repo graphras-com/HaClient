@@ -270,3 +270,48 @@ async def test_accessor_cls_none_falls_back_to_base() -> None:
         assert type(accessor) is DomainAccessor
     finally:
         await ha.close()
+
+
+def test_docs_custom_domain_example_runs() -> None:
+    """Regression for #88: the docs custom-domain example must execute cleanly.
+
+    The README/quick-start once registered a duplicate ``fan`` domain, which
+    raised ``HAClientError`` the moment a user copied it. This test extracts
+    the documented example and re-runs it against an isolated registry so any
+    future regression — duplicate name, removed helper, renamed import — is
+    caught immediately.
+    """
+    from pathlib import Path
+
+    docs_path = Path(__file__).resolve().parent.parent / "docs" / "index.md"
+    text = docs_path.read_text(encoding="utf-8")
+
+    marker = "### Adding a custom domain"
+    assert marker in text, "Quick-start section missing from docs/index.md"
+    section = text.split(marker, 1)[1]
+    # Grab the first fenced python block within the section.
+    fence_open = section.index("```python") + len("```python")
+    fence_close = section.index("```", fence_open)
+    snippet = section[fence_open:fence_close].strip()
+
+    # The published example uses the shared registry via ``register_domain``;
+    # rebind that helper to an isolated registry so the test never mutates
+    # process-wide state. Strip the import line so our injected bindings win.
+    snippet_lines = [
+        line for line in snippet.splitlines() if not line.startswith("from haclient import")
+    ]
+    snippet = "\n".join(snippet_lines)
+
+    isolated = DomainRegistry()
+
+    def _register(spec: DomainSpec[Any]) -> None:
+        isolated.register(spec)
+
+    namespace: dict[str, Any] = {
+        "DomainSpec": DomainSpec,
+        "Entity": Entity,
+        "register_domain": _register,
+    }
+    exec(compile(snippet, str(docs_path), "exec"), namespace)
+
+    assert "sprinkler" in isolated, "Docs example must register the 'sprinkler' domain"
