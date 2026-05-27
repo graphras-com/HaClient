@@ -12,6 +12,9 @@ Custom domains can be added by registering a `DomainSpec` via
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
 from haclient.api import HAClient
 from haclient.config import ConnectionConfig, ServicePolicy
 from haclient.core.connection import Connection
@@ -67,4 +70,7 @@ __all__ = [
     "register_domain",
 ]
 
-__version__ = "0.2.0"
+try:
+    __version__ = _pkg_version("haclient")
+except PackageNotFoundError:  # pragma: no cover - only hit when package not installed
+    __version__ = "0.0.0+unknown"
