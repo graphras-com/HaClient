@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,14 +34,14 @@ class Lock(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_lock(self, func: Any) -> Any:
+    def on_lock(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the lock becomes locked.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``locked`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``locked`` state.
 
         Returns
         -------
@@ -51,14 +50,14 @@ class Lock(Entity):
         """
         return self._register_state_transition_listener("locked", func)
 
-    def on_unlock(self, func: Any) -> Any:
+    def on_unlock(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the lock becomes unlocked.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``unlocked`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``unlocked`` state.
 
         Returns
         -------
@@ -67,14 +66,14 @@ class Lock(Entity):
         """
         return self._register_state_transition_listener("unlocked", func)
 
-    def on_jam(self, func: Any) -> Any:
+    def on_jam(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the lock jams.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``jammed`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``jammed`` state.
 
         Returns
         -------

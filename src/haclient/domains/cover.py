@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Cover(Entity):
@@ -19,14 +17,14 @@ class Cover(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_open(self, func: Any) -> Any:
+    def on_open(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the cover opens.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``open`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``open`` state.
 
         Returns
         -------
@@ -35,14 +33,14 @@ class Cover(Entity):
         """
         return self._register_state_transition_listener("open", func)
 
-    def on_close(self, func: Any) -> Any:
+    def on_close(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the cover closes.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``closed`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``closed`` state.
 
         Returns
         -------
@@ -51,14 +49,14 @@ class Cover(Entity):
         """
         return self._register_state_transition_listener("closed", func)
 
-    def on_position_change(self, func: Any) -> Any:
+    def on_position_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for position changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``current_position`` value
-            (0-100).
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``current_position`` attribute (0-100) changes.
 
         Returns
         -------

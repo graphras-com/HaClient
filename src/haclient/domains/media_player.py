@@ -236,14 +236,14 @@ class MediaPlayer(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_volume_change(self, func: Any) -> Any:
+    def on_volume_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for volume level changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``volume_level`` value
-            (``0.0``-``1.0``).
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``volume_level`` attribute (``0.0``-``1.0``) changes.
 
         Returns
         -------
@@ -252,13 +252,14 @@ class MediaPlayer(Entity):
         """
         return self._register_attr_listener("volume_level", func)
 
-    def on_mute_change(self, func: Any) -> Any:
+    def on_mute_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for mute state changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new ``is_volume_muted`` value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``is_volume_muted`` attribute changes.
 
         Returns
         -------
@@ -267,16 +268,14 @@ class MediaPlayer(Entity):
         """
         return self._register_attr_listener("is_volume_muted", func)
 
-    def on_media_change(self, func: Any) -> Any:
+    def on_media_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the playing media changes.
-
-        Receives ``(old: NowPlaying, new: NowPlaying)``.
 
         Parameters
         ----------
         func : callable
-            Callable invoked with the previous and current `NowPlaying`
-            snapshots whenever they differ.
+            Callable invoked with ``(old, new)`` where both arguments
+            are `NowPlaying` snapshots whenever they differ.
 
         Returns
         -------
@@ -286,14 +285,14 @@ class MediaPlayer(Entity):
         self._media_change_listeners.append(func)
         return func
 
-    def on_play(self, func: Any) -> Any:
+    def on_play(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when playback starts.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``playing`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``playing`` state.
 
         Returns
         -------
@@ -302,14 +301,14 @@ class MediaPlayer(Entity):
         """
         return self._register_state_transition_listener("playing", func)
 
-    def on_pause(self, func: Any) -> Any:
+    def on_pause(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when playback pauses.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``paused`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``paused`` state.
 
         Returns
         -------
@@ -318,14 +317,14 @@ class MediaPlayer(Entity):
         """
         return self._register_state_transition_listener("paused", func)
 
-    def on_stop(self, func: Any) -> Any:
+    def on_stop(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when playback stops.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``idle`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``idle`` state.
 
         Returns
         -------

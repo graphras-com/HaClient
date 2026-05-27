@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Humidifier(Entity):
@@ -26,14 +24,14 @@ class Humidifier(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_turn_on(self, func: Any) -> Any:
+    def on_turn_on(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the humidifier turns on.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``on`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``on`` state.
 
         Returns
         -------
@@ -42,14 +40,14 @@ class Humidifier(Entity):
         """
         return self._register_state_transition_listener("on", func)
 
-    def on_turn_off(self, func: Any) -> Any:
+    def on_turn_off(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the humidifier turns off.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``off`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``off`` state.
 
         Returns
         -------
@@ -58,13 +56,14 @@ class Humidifier(Entity):
         """
         return self._register_state_transition_listener("off", func)
 
-    def on_humidity_change(self, func: Any) -> Any:
+    def on_humidity_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for target humidity changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new target ``humidity`` value.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the target ``humidity`` attribute changes.
 
         Returns
         -------
@@ -73,13 +72,14 @@ class Humidifier(Entity):
         """
         return self._register_attr_listener("humidity", func)
 
-    def on_mode_change(self, func: Any) -> Any:
+    def on_mode_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for operating mode changes.
 
         Parameters
         ----------
         func : callable
-            Callable receiving the new mode string.
+            Callable invoked with ``(old_value, new_value)`` whenever
+            the ``mode`` attribute changes.
 
         Returns
         -------

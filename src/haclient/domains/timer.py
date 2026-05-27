@@ -228,14 +228,14 @@ class Timer(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_start(self, func: Any) -> Any:
+    def on_start(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the timer starts (becomes active).
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``active`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``active`` state.
 
         Returns
         -------
@@ -244,14 +244,14 @@ class Timer(Entity):
         """
         return self._register_state_transition_listener("active", func)
 
-    def on_pause(self, func: Any) -> Any:
+    def on_pause(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the timer is paused.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``paused`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``paused`` state.
 
         Returns
         -------
@@ -260,14 +260,14 @@ class Timer(Entity):
         """
         return self._register_state_transition_listener("paused", func)
 
-    def on_idle(self, func: Any) -> Any:
+    def on_idle(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the timer becomes idle.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``idle`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``idle`` state.
 
         Returns
         -------
@@ -276,7 +276,7 @@ class Timer(Entity):
         """
         return self._register_state_transition_listener("idle", func)
 
-    def on_finished(self, func: Any) -> Any:
+    def on_finished(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for natural timer expiry.
 
         Driven by the HA ``timer.finished`` event (not state changes).
@@ -284,8 +284,8 @@ class Timer(Entity):
         Parameters
         ----------
         func : callable
-            Callable invoked with ``(entity_id, event_data)`` when the
-            timer expires.
+            Sync or async callable invoked with ``(entity_id, event_data)``
+            when the timer expires.
 
         Returns
         -------
@@ -295,7 +295,7 @@ class Timer(Entity):
         self._finished_listeners.append(func)
         return func
 
-    def on_cancelled(self, func: Any) -> Any:
+    def on_cancelled(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for explicit timer cancellation.
 
         Driven by the HA ``timer.cancelled`` event (not state changes).

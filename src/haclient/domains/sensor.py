@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Sensor(Entity):
@@ -20,15 +18,15 @@ class Sensor(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_value_change(self, func: Any) -> Any:
+    def on_value_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for sensor value changes.
-
-        Receives the **state strings** directly (e.g. ``"21.5"``).
 
         Parameters
         ----------
         func : callable
-            Sync or async callable receiving the new state string.
+            Sync or async callable invoked with the previous and current
+            sensor **state strings** as ``(old_value, new_value)``
+            (e.g. ``("21.5", "22.0")``).
 
         Returns
         -------

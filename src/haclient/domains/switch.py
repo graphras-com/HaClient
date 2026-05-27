@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 class Switch(Entity):
@@ -20,14 +18,14 @@ class Switch(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_turn_on(self, func: Any) -> Any:
+    def on_turn_on(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the switch turns on.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``on`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``on`` state.
 
         Returns
         -------
@@ -36,14 +34,14 @@ class Switch(Entity):
         """
         return self._register_state_transition_listener("on", func)
 
-    def on_turn_off(self, func: Any) -> Any:
+    def on_turn_off(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for when the switch turns off.
 
         Parameters
         ----------
         func : callable
-            Sync or async zero-argument callable invoked on every
-            transition into the ``off`` state.
+            Sync or async callable invoked with ``(old_state, new_state)``
+            on every transition into the ``off`` state.
 
         Returns
         -------

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from haclient.core.plugins import DomainSpec, register_domain
-from haclient.entity.base import Entity
+from haclient.entity.base import Entity, ValueChangeHandler
 
 
 def _coerce_numeric(value: Any) -> float | int | None:
@@ -63,7 +63,7 @@ class AirQuality(Entity):
 
     # -- Listener decorators ------------------------------------------
 
-    def on_aqi_change(self, func: Any) -> Any:
+    def on_aqi_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for Air Quality Index changes.
 
         Fires whenever the entity *state* string changes, which mirrors
@@ -81,7 +81,7 @@ class AirQuality(Entity):
         """
         return self._register_state_value_listener(func)
 
-    def on_pm25_change(self, func: Any) -> Any:
+    def on_pm25_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for PM2.5 attribute changes.
 
         Parameters
@@ -97,7 +97,7 @@ class AirQuality(Entity):
         """
         return self._register_attr_listener("particulate_matter_2_5", func)
 
-    def on_co2_change(self, func: Any) -> Any:
+    def on_co2_change(self, func: ValueChangeHandler) -> ValueChangeHandler:
         """Register a listener for CO2 attribute changes.
 
         Parameters
