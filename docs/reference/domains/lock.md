@@ -1,0 +1,3 @@
+# Lock
+
+::: haclient.domains.lock

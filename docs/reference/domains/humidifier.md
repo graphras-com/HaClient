@@ -1,0 +1,3 @@
+# Humidifier
+
+::: haclient.domains.humidifier

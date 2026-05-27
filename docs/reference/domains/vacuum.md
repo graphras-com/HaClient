@@ -1,0 +1,3 @@
+# Vacuum
+
+::: haclient.domains.vacuum

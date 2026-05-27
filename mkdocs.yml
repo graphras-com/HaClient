@@ -40,15 +40,22 @@ nav:
           - REST adapter: reference/infra/rest_aiohttp.md
           - WebSocket adapter: reference/infra/ws_aiohttp.md
       - Domains:
-          - Light: reference/domains/light.md
-          - Switch: reference/domains/switch.md
+          - Air Quality: reference/domains/air_quality.md
+          - Binary Sensor: reference/domains/binary_sensor.md
           - Climate: reference/domains/climate.md
           - Cover: reference/domains/cover.md
-          - Sensor: reference/domains/sensor.md
-          - Binary Sensor: reference/domains/binary_sensor.md
+          - Event: reference/domains/event.md
+          - Fan: reference/domains/fan.md
+          - Humidifier: reference/domains/humidifier.md
+          - Light: reference/domains/light.md
+          - Lock: reference/domains/lock.md
           - Media Player: reference/domains/media_player.md
           - Scene: reference/domains/scene.md
+          - Sensor: reference/domains/sensor.md
+          - Switch: reference/domains/switch.md
           - Timer: reference/domains/timer.md
+          - Vacuum: reference/domains/vacuum.md
+          - Valve: reference/domains/valve.md
 
 hooks:
   - tools/mkdocs_hooks.py

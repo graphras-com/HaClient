@@ -13,7 +13,7 @@ Async-first, high-level Python client for Home Assistant with REST and WebSocket
 ## Features
 
 - Async context manager with automatic WebSocket connection and state priming
-- Typed domain accessors: light, switch, climate, cover, sensor, binary sensor, media player, scene, timer
+- Typed domain accessors: air quality, binary sensor, climate, cover, event, fan, humidifier, light, lock, media player, scene, sensor, switch, timer, vacuum, valve
 - Intent-specific methods over raw service calls (e.g. `light.set_brightness(200)` instead of `light.turn_on(brightness=200)`)
 - Real-time state change listeners with granular attribute and state-transition filtering
 - Synchronous blocking wrapper for scripts, REPL, and Jupyter
