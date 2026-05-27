@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from haclient.exceptions import AuthenticationError, HAClientError
+from haclient.exceptions import AuthenticationError, HAClientError, HTTPError
 from haclient.infra.rest_aiohttp import AiohttpRestAdapter
 
 from .fake_ha import FakeHA
@@ -65,11 +65,68 @@ async def test_call_service_error(fake_ha: FakeHA) -> None:
 
 
 async def test_request_server_error(fake_ha: FakeHA) -> None:
-    """Trigger a non-auth error path by hitting an unknown REST endpoint."""
+    """Non-auth HTTP errors are raised as HTTPError (subclass of HAClientError)."""
     rc = AiohttpRestAdapter(fake_ha.base_url, fake_ha.token)
     try:
-        with pytest.raises(HAClientError):
+        with pytest.raises(HTTPError) as exc_info:
             await rc._request("GET", "/api/does-not-exist")
+        assert exc_info.value.status == 404
+        assert exc_info.value.method == "GET"
+        assert exc_info.value.path == "/api/does-not-exist"
+        # HTTPError is still a HAClientError
+        assert isinstance(exc_info.value, HAClientError)
+    finally:
+        await rc.close()
+
+
+async def test_http_error_attributes(fake_ha: FakeHA) -> None:
+    """HTTPError exposes status, method, path, and body as structured attributes."""
+    rc = AiohttpRestAdapter(fake_ha.base_url, fake_ha.token)
+    try:
+        with pytest.raises(HTTPError) as exc_info:
+            await rc._request("GET", "/api/does-not-exist")
+        err = exc_info.value
+        assert err.status == 404
+        assert err.method == "GET"
+        assert err.path == "/api/does-not-exist"
+        assert isinstance(err.body, str)
+        # String representation should include status code
+        assert "404" in str(err)
+    finally:
+        await rc.close()
+
+
+async def test_get_state_returns_none_only_for_404(fake_ha: FakeHA) -> None:
+    """get_state() returns None for a real 404, not for other HTTP errors."""
+    fake_ha.states = [{"entity_id": "light.kitchen", "state": "on", "attributes": {}}]
+    rc = AiohttpRestAdapter(fake_ha.base_url, fake_ha.token)
+    try:
+        # Known entity returns state dict
+        state = await rc.get_state("light.kitchen")
+        assert state is not None
+        assert state["state"] == "on"
+
+        # Unknown entity → 404 → None (not an exception)
+        missing = await rc.get_state("light.does_not_exist")
+        assert missing is None
+    finally:
+        await rc.close()
+
+
+async def test_get_state_reraises_non_404_http_error(
+    fake_ha: FakeHA, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """get_state() re-raises HTTPError for status codes other than 404."""
+    rc = AiohttpRestAdapter(fake_ha.base_url, fake_ha.token)
+
+    async def fake_request(method: str, path: str, **_: object) -> object:
+        raise HTTPError(500, method, path, "internal server error")
+
+    monkeypatch.setattr(rc, "_request", fake_request)
+    try:
+        with pytest.raises(HTTPError) as exc_info:
+            await rc.get_state("light.kitchen")
+        assert exc_info.value.status == 500
     finally:
         await rc.close()
 

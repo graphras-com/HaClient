@@ -33,6 +33,7 @@ from haclient.exceptions import (
     ConnectionClosedError,
     EntityNotFoundError,
     HAClientError,
+    HTTPError,
     TimeoutError,
 )
 from haclient.ports import Clock, RestPort, WebSocketPort
@@ -55,6 +56,7 @@ __all__ = [
     "EventBus",
     "HAClient",
     "HAClientError",
+    "HTTPError",
     "RestPort",
     "ServiceCaller",
     "ServicePolicy",

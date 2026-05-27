@@ -12,7 +12,7 @@ from typing import Any
 
 import aiohttp
 
-from haclient.exceptions import AuthenticationError, HAClientError
+from haclient.exceptions import AuthenticationError, HAClientError, HTTPError
 from haclient.exceptions import TimeoutError as HATimeoutError
 
 _LOGGER = logging.getLogger(__name__)
@@ -110,8 +110,10 @@ class AiohttpRestAdapter:
         ------
         AuthenticationError
             On HTTP 401.
+        HTTPError
+            On any other HTTP error (status >= 400).
         HAClientError
-            On any other HTTP error or connection failure.
+            On connection failure.
         TimeoutError
             On request timeout.
         """
@@ -130,7 +132,7 @@ class AiohttpRestAdapter:
                     raise AuthenticationError("Invalid or expired access token")
                 if resp.status >= 400:
                     body = await resp.text()
-                    raise HAClientError(f"HTTP {resp.status} from {method} {path}: {body.strip()}")
+                    raise HTTPError(resp.status, method, path, body)
                 if resp.status == 200 and resp.content_type == "application/json":
                     return await resp.json()
                 return await resp.text()
@@ -182,11 +184,18 @@ class AiohttpRestAdapter:
         -------
         dict or None
             The state object, or ``None`` on HTTP 404.
+
+        Raises
+        ------
+        HTTPError
+            On any HTTP error other than 404.
+        AuthenticationError
+            On HTTP 401.
         """
         try:
             data = await self._request("GET", f"/api/states/{entity_id}")
-        except HAClientError as err:
-            if "HTTP 404" in str(err):
+        except HTTPError as err:
+            if err.status == 404:
                 return None
             raise
         if isinstance(data, dict):
