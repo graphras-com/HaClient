@@ -5,12 +5,33 @@ build-backend = "hatchling.build"
 [project]
 name = "haclient"
 dynamic = ["version"]
-description = "Async-first, high-level Python client for Home Assistant (REST + WebSocket)."
+description = "A high-level typed Python SDK for building applications on top of the Home Assistant REST and WebSocket APIs."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [{ name = "HAClient Contributors" }]
-keywords = ["home-assistant", "homeassistant", "async", "websocket", "iot"]
+keywords = [
+  "home-assistant",
+  "homeassistant",
+  "python",
+  "asyncio",
+  "websocket",
+  "rest-api",
+  "smart-home",
+  "automation",
+  "typed",
+  "mypy",
+  "reactive",
+  "sdk",
+  "async",
+  "pep561",
+  "realtime",
+  "event-driven",
+  "iot",
+  "home-automation",
+  "typed-python",
+  "domain-driven"
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: AsyncIO",

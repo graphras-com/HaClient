@@ -6,7 +6,9 @@
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/HaClient/network/updates)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Async-first, high-level Python client for Home Assistant with REST and WebSocket support. Provides typed domain accessors, real-time state tracking, automatic reconnection, and a synchronous wrapper for scripts and REPL use.
+A high-level typed Python SDK for building applications on top of the Home Assistant REST and WebSocket APIs.
+
+Unlike low-level Home Assistant clients that expose raw service calls and entity state payloads, this library provides domain-oriented accessors and intent-driven APIs designed for application development.
 
 **[Documentation](https://graphras-com.github.io/HaClient/)**
 
